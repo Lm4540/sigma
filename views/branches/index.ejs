@@ -1,0 +1,74 @@
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/branches' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <div class="flex justify-between items-center mb-6">
+        <span class="text-muted text-sm"><%= branches.length %> sucursales</span>
+        <button class="btn btn-primary" onclick="document.getElementById('modalBranch').classList.add('open')">+ Nueva sucursal</button>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>
+              <% branches.forEach(b => { %>
+              <tr>
+                <td style="font-weight:500"><%= b.name %></td>
+                <td class="text-muted"><%= b.address || '—' %></td>
+                <td class="mono"><%= b.phone || '—' %></td>
+                <td><span class="badge <%= b.status === 'on' ? 'badge-success' : 'badge-error' %>"><%= b.status === 'on' ? 'Activa' : 'Inactiva' %></span></td>
+                <td><button class="btn btn-ghost btn-sm" onclick="toggleBranch(<%= b.id %>)"><%= b.status === 'on' ? 'Desactivar' : 'Activar' %></button></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<div class="modal-overlay" id="modalBranch">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Nueva sucursal</span>
+      <button class="modal-close" onclick="document.getElementById('modalBranch').classList.remove('open')">×</button>
+    </div>
+    <form id="formBranch">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group"><label class="form-label">Nombre <span>*</span></label><input class="form-control" name="name" required></div>
+        <div class="form-group"><label class="form-label">Dirección</label><input class="form-control" name="address"></div>
+        <div class="form-group"><label class="form-label">Teléfono</label><input class="form-control" name="phone"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalBranch').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('formBranch').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  const r = await fetch('/branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Sucursal creada' : data.message, data.success ? 'success' : 'error');
+  if (data.success) location.reload();
+});
+
+async function toggleBranch(id) {
+  const r = await fetch(`/branches/${id}/status`, { method: 'PATCH' });
+  const data = await r.json();
+  if (data.success) location.reload();
+}
+</script>

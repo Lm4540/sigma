@@ -1,0 +1,329 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const pct = (v, total) => total > 0 ? Math.min(100, Math.round((v / total) * 100)) : 0;
+const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', rechazado:'badge-error', aplicado:'badge-info' };
+const STATUS_LABEL = { pendiente:'Pendiente', autorizado:'Autorizado', rechazado:'Rechazado', aplicado:'Aplicado' };
+const riskCats = ['A1','A2','B','C','D','E'];
+const totalCartera = riskDist.reduce((s, r) => s + parseInt(r.total), 0);
+const totalBalance = riskDist.reduce((s, r) => s + parseFloat(r.totalBalance || 0), 0);
+const dailyMax = daily.length ? Math.max(...daily.map(d => parseInt(d.total)), 1) : 1;
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/reports' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Filtros -->
+      <div class="card mb-6">
+        <form method="GET" action="/reports" class="flex gap-3 items-center" style="flex-wrap:wrap">
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">Desde</label>
+            <input class="form-control" type="date" name="from" value="<%= filters.from %>">
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">Hasta</label>
+            <input class="form-control" type="date" name="to" value="<%= filters.to %>">
+          </div>
+          <% if (user.roleId === 1 && branches.length) { %>
+          <div class="form-group" style="min-width:180px">
+            <label class="form-label">Sucursal</label>
+            <select class="form-control" name="branch">
+              <option value="">Todas</option>
+              <% branches.forEach(b => { %><option value="<%= b.id %>" <%= filters.branch == b.id ? 'selected' : '' %>><%= b.name %></option><% }) %>
+            </select>
+          </div>
+          <% } %>
+          <div style="margin-top:18px">
+            <button type="submit" class="btn btn-primary">Aplicar</button>
+            <a href="/reports" class="btn btn-ghost" style="margin-left:8px">Limpiar</a>
+            <a href="/reports/pdf?from=<%= filters.from %>&to=<%= filters.to %><%= filters.branch ? '&branch=' + filters.branch : '' %>" class="btn btn-ghost" style="margin-left:8px" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px;margin-right:4px"><path d="M4 2h6l4 4v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M10 2v4h4"/><path d="M5 9h6M5 12h4"/></svg>
+              Exportar PDF
+            </a>
+            <a href="/reports/export?from=<%= filters.from %>&to=<%= filters.to %><%= filters.branch ? '&branch=' + filters.branch : '' %>" class="btn btn-ghost" style="margin-left:8px">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px;margin-right:4px"><path d="M3 2h7l4 4v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M10 2v4h4"/><path d="M5 8h6M5 11h3M8 11v3"/></svg>
+              Exportar Excel
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <!-- KPIs de acción rápida -->
+      <div class="stats-grid mb-6">
+        <% if ([1,2].includes(user.roleId)) { %>
+        <div class="stat-card" style="border-left: 3px solid var(--amber)">
+          <div class="stat-label">Pagos por autorizar</div>
+          <div class="stat-value <%= parseInt(pendingAuth.total) > 0 ? 'amber' : '' %>"><%= pendingAuth.total %></div>
+          <div class="stat-sub" style="margin-top:8px">
+            <a href="/collections/pending" class="btn btn-amber btn-sm" style="font-size:11px">
+              $ <%= fmt(pendingAuth.totalAmount) %> → Ver lista
+            </a>
+          </div>
+        </div>
+        <% } %>
+        <% if (user.roleId === 4) { %>
+        <div class="stat-card" style="border-left: 3px solid #82aaff">
+          <div class="stat-label">Pagos por aplicar en ERP</div>
+          <div class="stat-value" style="color:#1e3a5f"><%= pendingApply.total %></div>
+          <div class="stat-sub" style="margin-top:8px">
+            <a href="/collections/pending" class="btn btn-ghost btn-sm" style="font-size:11px">$ <%= fmt(pendingApply.totalAmount) %> → Aplicar</a>
+          </div>
+        </div>
+        <% } %>
+        <% if ([1,2].includes(user.roleId)) { %>
+        <div class="stat-card" style="border-left: 3px solid var(--risk-a1-border)">
+          <div class="stat-label">Pagos aplicados en ERP</div>
+          <div class="stat-value" style="color:var(--risk-a1-text)"><%= appliedPayments.total || 0 %></div>
+          <div class="stat-sub">$ <%= fmt(appliedPayments.totalAmount) %></div>
+        </div>
+        <% } %>
+        <div class="stat-card">
+          <div class="stat-label">Total cartera</div>
+          <div class="stat-value navy"><%= totalCartera.toLocaleString('es-SV') %></div>
+          <div class="stat-sub">$ <%= fmt(totalBalance) %></div>
+        </div>
+      </div>
+
+      <!-- KPIs de metas por gestor -->
+      <% if (byGestor.length > 0) { %>
+      <div class="card mb-6">
+        <div class="card-header">
+          <span class="card-title">Metas por gestor — <%= filters.from %> al <%= filters.to %></span>
+          <div class="flex items-center gap-3">
+            <span class="text-muted text-sm">
+              Meta: <%= META_GESTIONES %> gestiones · $ <%= fmt(META_RECUPERADO) %> recuperado
+              <% if (scaleFactor !== 1) { %><span class="text-muted" style="font-size:11px"> (base mensual: <%= META_GESTIONES_BASE %> gestiones · $ <%= fmt(META_RECUPERADO_BASE) %>)</span><% } %>
+            </span>
+            <% if (user.roleId === 1) { %>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalMetaConfig').classList.add('open')" title="Configurar metas" style="padding:4px 8px">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+              Configurar
+            </button>
+            <% } %>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0">
+          <% byGestor.forEach((g, i) => {
+            const pctG = pct(parseInt(g.totalGestiones), META_GESTIONES);
+            const pctR = pct(parseFloat(g.recuperado || 0), META_RECUPERADO);
+            const colorG = pctG >= 100 ? 'var(--risk-a1-text)' : pctG >= 60 ? 'var(--amber)' : 'var(--error-text)';
+            const colorR = pctR >= 100 ? 'var(--risk-a1-text)' : pctR >= 60 ? 'var(--amber)' : 'var(--error-text)';
+          %>
+          <div style="padding:16px 20px;<%= i > 0 ? 'border-top:1px solid var(--border-2)' : '' %>">
+            <div class="flex items-center gap-4 mb-2">
+              <span style="font-weight:600;min-width:180px"><%= g.name %></span>
+              <div class="flex gap-2" style="flex:1;flex-wrap:wrap">
+                <span class="badge badge-neutral"><%= g.visitas || 0 %> visitas</span>
+                <span class="badge badge-neutral"><%= g.llamadas || 0 %> llamadas</span>
+                <span class="badge badge-neutral"><%= g.whatsapp || 0 %> WA</span>
+                <span class="badge badge-neutral"><%= g.mensajes || 0 %> msg</span>
+              </div>
+              <span class="mono" style="color:var(--amber);font-weight:700;white-space:nowrap">$ <%= fmt(g.recuperado) %></span>
+            </div>
+            <div class="flex gap-4">
+              <!-- Meta gestiones -->
+              <div style="flex:1">
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-muted">Gestiones</span>
+                  <span style="font-weight:600;color:<%= colorG %>"><%= g.totalGestiones || 0 %>/<%= META_GESTIONES %> (<%= pctG %>%)</span>
+                </div>
+                <div style="height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:<%= pctG %>%;background:<%= colorG %>;border-radius:3px;transition:width 0.4s"></div>
+                </div>
+              </div>
+              <!-- Meta recuperación -->
+              <div style="flex:1">
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-muted">Recuperado</span>
+                  <span style="font-weight:600;color:<%= colorR %>">$ <%= fmt(g.recuperado) %> (<%= pctR %>%)</span>
+                </div>
+                <div style="height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:<%= pctR %>%;background:<%= colorR %>;border-radius:3px;transition:width 0.4s"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+      <% } %>
+
+      <div class="grid-2 mb-6">
+
+        <!-- Distribución NCB-022 -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Cartera por riesgo NCB-022</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cat.</th><th style="text-align:right">Clientes</th><th style="text-align:right">%</th><th style="text-align:right">Saldo</th></tr></thead>
+              <tbody>
+                <% riskCats.forEach(cat => {
+                  const row   = riskDist.find(r => r.riskCategory === cat);
+                  const count = row ? parseInt(row.total) : 0;
+                  const bal   = row ? parseFloat(row.totalBalance || 0) : 0;
+                  const p     = pct(count, totalCartera);
+                %>
+                <tr>
+                  <td><span class="risk-chip <%= cat %>"><%= cat %></span></td>
+                  <td style="text-align:right" class="mono"><%= count %></td>
+                  <td style="text-align:right">
+                    <div class="flex items-center gap-2 justify-between">
+                      <div style="flex:1;height:5px;background:var(--surface-3);border-radius:3px"><div style="height:100%;width:<%= p %>%;background:var(--navy);border-radius:3px"></div></div>
+                      <span class="mono text-sm"><%= p %>%</span>
+                    </div>
+                  </td>
+                  <td style="text-align:right" class="mono">$ <%= fmt(bal) %></td>
+                </tr>
+                <% }) %>
+                <tr style="border-top:2px solid var(--border);font-weight:600">
+                  <td>Total</td><td style="text-align:right" class="mono"><%= totalCartera %></td><td></td><td style="text-align:right" class="mono">$ <%= fmt(totalBalance) %></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Estado de pagos en el período -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Pagos en el período</span></div>
+          <% if (!paymentStatus.length) { %>
+          <div class="empty-state"><div class="empty-state-title">Sin pagos en el período</div></div>
+          <% } else { %>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <% paymentStatus.forEach(p => { %>
+            <div class="flex justify-between items-center">
+              <span class="badge <%= STATUS_CLASS[p.status] || 'badge-neutral' %>"><%= STATUS_LABEL[p.status] || p.status %></span>
+              <div style="text-align:right">
+                <div class="mono" style="font-weight:600">$ <%= fmt(p.totalAmount) %></div>
+                <div class="text-muted text-sm"><%= p.total %> pago<%= p.total != 1 ? 's' : '' %></div>
+              </div>
+            </div>
+            <% }) %>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (user.roleId === 1 && byBranch.length > 0) { %>
+      <!-- Recuperación por sucursal (solo admin) -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">Recuperación por sucursal</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Sucursal</th><th style="text-align:right">Gestiones</th><th style="text-align:right">Recuperado</th></tr></thead>
+            <tbody>
+              <% const maxRec = Math.max(...byBranch.map(b => parseFloat(b.recuperado || 0)), 1); %>
+              <% byBranch.forEach(b => { const p = pct(parseFloat(b.recuperado || 0), maxRec); %>
+              <tr>
+                <td style="font-weight:500"><%= b.branchName %></td>
+                <td style="text-align:right" class="mono"><%= b.gestiones || 0 %></td>
+                <td style="text-align:right">
+                  <div class="flex items-center gap-2 justify-end">
+                    <div style="width:80px;height:5px;background:var(--surface-3);border-radius:3px"><div style="height:100%;width:<%= p %>%;background:var(--amber);border-radius:3px"></div></div>
+                    <span class="mono" style="color:var(--amber);font-weight:600;min-width:80px;text-align:right">$ <%= fmt(b.recuperado) %></span>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <% } %>
+
+      <div class="grid-2 mb-6">
+        <!-- Actividad diaria (sparkbar) -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Gestiones últimos 14 días</span></div>
+          <% if (!daily.length) { %>
+          <div class="empty-state"><div class="empty-state-title">Sin actividad</div></div>
+          <% } else { %>
+          <div style="display:flex;align-items:flex-end;gap:5px;height:90px;padding:4px 0">
+            <% daily.forEach(d => {
+              const h = Math.max(6, Math.round((parseInt(d.total) / dailyMax) * 70));
+              const fecha = new Date(d.fecha).toLocaleDateString('es-SV', { day:'2-digit', month:'2-digit' });
+            %>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px" title="<%= fecha %>: <%= d.total %> gestiones">
+              <span style="font-size:9px;color:var(--ink-3)"><%= d.total %></span>
+              <div style="height:<%= h %>px;width:100%;background:var(--navy);border-radius:3px 3px 0 0;opacity:0.85"></div>
+              <span style="font-size:9px;color:var(--ink-4);white-space:nowrap"><%= fecha %></span>
+            </div>
+            <% }) %>
+          </div>
+          <% } %>
+        </div>
+
+        <!-- Top 5 clientes con mayor deuda -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Mayor saldo pendiente</span></div>
+          <% topClients.forEach((c, i) => { %>
+          <div style="display:flex;align-items:center;gap:10px;<%= i > 0 ? 'padding-top:12px;margin-top:12px;border-top:1px solid var(--border-2)' : '' %>">
+            <span style="font-size:11px;font-weight:700;color:var(--ink-4);min-width:16px;text-align:center"><%= i + 1 %></span>
+            <div style="flex:1;overflow:hidden">
+              <a href="/clients/<%= c.id %>" style="font-weight:500;color:var(--navy);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= c.name %></a>
+              <div class="flex gap-2 items-center" style="margin-top:2px">
+                <span class="risk-chip <%= c.riskCategory %>"><%= c.riskCategory %></span>
+                <span class="text-muted text-sm"><%= c.daysLate %> días</span>
+              </div>
+            </div>
+            <span class="mono" style="font-weight:700;color:var(--error-text);white-space:nowrap">$ <%= fmt(c.totalDeuda) %></span>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<% if (user.roleId === 1) { %>
+<!-- Modal configurar metas mensuales -->
+<div class="modal-overlay" id="modalMetaConfig">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">Metas mensuales</span>
+      <button class="modal-close" onclick="document.getElementById('modalMetaConfig').classList.remove('open')">×</button>
+    </div>
+    <form id="formMetaConfig">
+      <div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">
+        <div class="form-group">
+          <label class="form-label">Meta de gestiones por gestor / mes</label>
+          <input class="form-control" type="number" name="meta_gestiones_mensual" min="1" step="1" value="<%= META_GESTIONES_BASE %>" required>
+          <div class="text-muted text-sm" style="margin-top:4px">Al consultar rangos de más de un mes, la meta se escala proporcionalmente.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Meta de monto recuperado / mes (USD)</label>
+          <input class="form-control" type="number" name="meta_recuperado_mensual" min="0.01" step="0.01" value="<%= META_RECUPERADO_BASE %>" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalMetaConfig').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveMeta">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('formMetaConfig').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnSaveMeta');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    const r = await fetch('/reports/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Metas actualizadas' : (data.message || 'Error'), data.success ? 'success' : 'error');
+    if (data.success) { document.getElementById('modalMetaConfig').classList.remove('open'); location.reload(); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+});
+</script>
+<% } %>

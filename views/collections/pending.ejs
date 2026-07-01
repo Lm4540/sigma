@@ -1,0 +1,129 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const fmtDT = (d) => d ? new Date(d).toLocaleString('es-SV') : '—';
+const TYPE_LABEL = { efectivo:'Efectivo', especie:'Especie', cheque:'Cheque', transferencia:'Transferencia' };
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/collections/pending' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <% if (payments.length === 0) { %>
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-title">Sin pagos pendientes</div>
+          <div class="empty-state-desc">Todos los pagos han sido procesados.</div>
+        </div>
+      </div>
+      <% } else { %>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Gestor</th>
+                <th>Tipo</th>
+                <th style="text-align:right">Monto</th>
+                <th>Fecha</th>
+                <th>Evidencia</th>
+                <% if ([1,2].includes(user.roleId)) { %><th>Acciones</th><% } %>
+                <% if (user.roleId === 4) { %><th>Aplicar</th><% } %>
+              </tr>
+            </thead>
+            <tbody>
+              <% payments.forEach(p => { %>
+              <tr id="row-<%= p.id %>">
+                <td>
+                  <div style="font-weight:500"><%= p.clientName %></div>
+                  <div class="mono text-muted"><%= p.loanNumber || '' %></div>
+                </td>
+                <td class="text-muted"><%= p.gestorName %></td>
+                <td><span class="badge badge-neutral"><%= TYPE_LABEL[p.paymentType] || p.paymentType %></span></td>
+                <td style="text-align:right"><span class="mono" style="font-weight:600;color:var(--amber)">$ <%= fmt(p.paymentAmount) %></span></td>
+                <td class="text-muted"><%= fmtDT(p.createdAt) %></td>
+                <td>
+                  <% if (p.evidenceUrl) { %>
+                  <a href="<%= p.evidenceUrl %>" target="_blank" class="btn btn-ghost btn-sm">Ver foto</a>
+                  <% } else { %><span class="text-muted">—</span><% } %>
+                </td>
+                <% if ([1,2].includes(user.roleId)) { %>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="paymentAction(<%= p.id %>, 'autorizar')">Autorizar</button>
+                    <button class="btn btn-danger btn-sm" onclick="paymentAction(<%= p.id %>, 'rechazar')">Rechazar</button>
+                  </div>
+                </td>
+                <% } %>
+                <% if (user.roleId === 4) { %>
+                <td>
+                  <button class="btn btn-amber btn-sm" onclick="applyPayment(<%= p.id %>)">Marcar aplicado</button>
+                </td>
+                <% } %>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<script>
+async function paymentAction(id, action) {
+  const autorizar = action === 'autorizar';
+  const ok = await window.sigma.confirm(
+    autorizar ? '¿Confirmar autorización de este pago?' : '¿Rechazar este pago? Esta acción no se puede deshacer.',
+    { confirmText: autorizar ? 'Autorizar' : 'Rechazar', danger: !autorizar }
+  );
+  if (!ok) return;
+  try {
+    const r = await fetch(`/collections/${id}/payment`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast(autorizar ? 'Pago autorizado' : 'Pago rechazado', 'success');
+      document.getElementById(`row-${id}`)?.remove();
+      checkEmpty();
+    } else {
+      window.sigma.toast(data.message || 'Error', 'error');
+    }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+
+async function applyPayment(id) {
+  const ok = await window.sigma.confirm(
+    '¿Confirmar que este pago fue aplicado correctamente en el ERP?',
+    { confirmText: 'Marcar aplicado', title: 'Aplicar pago' }
+  );
+  if (!ok) return;
+  try {
+    const r = await fetch(`/collections/${id}/apply`, { method: 'PATCH' });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Pago marcado como aplicado' : data.message, data.success ? 'success' : 'error');
+    if (data.success) { document.getElementById(`row-${id}`)?.remove(); checkEmpty(); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+
+function checkEmpty() {
+  if (document.querySelector('tbody')?.children.length === 0) {
+    document.querySelector('.card').outerHTML =
+      `<div class="card"><div class="empty-state">
+        <div class="empty-state-icon">✅</div>
+        <div class="empty-state-title">Sin pagos pendientes</div>
+        <div class="empty-state-desc">Todos los pagos han sido procesados.</div>
+      </div></div>`;
+  }
+}
+</script>

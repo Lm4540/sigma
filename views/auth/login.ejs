@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a2744">
+  <title>Iniciar sesión — SIGMA</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { background: var(--canvas); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-wrap { width: 100%; max-width: 380px; padding: var(--sp-4); }
+    .login-brand { text-align: center; margin-bottom: var(--sp-8); }
+    .login-brand-icon {
+      width: 52px; height: 52px; background: var(--navy);
+      border-radius: var(--r-lg); display: flex; align-items: center; justify-content: center;
+      font-size: 26px; font-weight: 800; color: #fff; margin: 0 auto var(--sp-3); letter-spacing: -1px;
+    }
+    .login-brand-name { font-size: 22px; font-weight: 700; color: var(--ink-1); letter-spacing: -0.5px; }
+    .login-brand-sub  { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: var(--sp-6);
+    }
+    .login-heading { font-size: 16px; font-weight: 600; color: var(--ink-1); margin-bottom: var(--sp-5); }
+    .form-stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+    .login-submit { width: 100%; padding: 10px; font-size: 14px; font-weight: 600; justify-content: center; margin-top: var(--sp-2); }
+    .login-divider { display: flex; align-items: center; gap: 10px; margin: 4px 0; color: var(--ink-4); font-size: 12px; }
+    .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .btn-biometric {
+      width: 100%; padding: 10px; font-size: 13px; font-weight: 600;
+      background: none; border: 1px solid var(--border-3); border-radius: var(--r-md);
+      color: var(--ink-2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 8px; transition: background 0.12s, border-color 0.12s;
+    }
+    .btn-biometric:hover { background: var(--surface-2); border-color: var(--navy); color: var(--navy); }
+    .login-footer { text-align: center; margin-top: var(--sp-5); font-size: 11px; color: var(--ink-4); }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-brand">
+      <div class="login-brand-icon">S</div>
+      <div class="login-brand-name">SIGMA</div>
+      <div class="login-brand-sub">Sistema de Gestión de Cobranza Móvil</div>
+    </div>
+
+    <div class="login-card">
+      <div class="login-heading">Iniciar sesión</div>
+
+      <% if (error) { %>
+        <div class="alert alert-error mb-4"><%= error %></div>
+      <% } %>
+
+      <form action="/login" method="POST" class="form-stack" id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="email">Correo electrónico</label>
+          <input class="form-control" type="email" id="email" name="email"
+            value="<%= email || '' %>" autocomplete="email" required placeholder="usuario@correo.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Contraseña</label>
+          <input class="form-control" type="password" id="password" name="password"
+            autocomplete="current-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary login-submit" id="submitBtn">Ingresar</button>
+      </form>
+
+      <div id="biometricArea" style="display:none">
+        <div class="login-divider" style="margin-top:16px">o</div>
+        <button class="btn-biometric" id="btnBiometric" onclick="loginBiometric()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <path d="M12 1a5 5 0 0 1 5 5v3M7 9V6a5 5 0 0 1 5-5"/><rect x="3" y="11" width="18" height="11" rx="2"/>
+            <circle cx="12" cy="16" r="2"/>
+          </svg>
+          Acceso biométrico
+        </button>
+      </div>
+    </div>
+
+    <div class="login-footer">SIGMA v2 &middot; El Salvador &middot; UTC-6</div>
+  </div>
+
+  <script>
+    // Mostrar botón de biometría si el navegador y el dispositivo lo soportan
+    if (window.PublicKeyCredential && navigator.credentials) {
+      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(available => {
+        if (available) {
+          document.getElementById('biometricArea').style.display = '';
+        }
+      }).catch(() => {});
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', function() {
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Verificando...';
+    });
+
+    async function loginBiometric() {
+      const email = document.getElementById('email').value.trim();
+      if (!email) { showMsg('Ingresa tu correo primero para usar biometría', 'error'); return; }
+      const btn = document.getElementById('btnBiometric');
+      btn.disabled = true; btn.textContent = 'Verificando...';
+      try {
+        // 1. Obtener opciones
+        const r1 = await fetch('/auth/webauthn/auth-options', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const { success, options, message } = await r1.json();
+        if (!success) { showMsg(message || 'Sin credenciales biométricas registradas', 'error'); btn.disabled = false; btn.textContent = 'Acceso biométrico'; return; }
+
+        // 2. Solicitar credencial al dispositivo
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            ...options,
+            challenge: _b64ToUint8(options.challenge),
+            allowCredentials: options.allowCredentials?.map(c => ({ ...c, id: _b64ToUint8(c.id) })) || [],
+          },
+        });
+
+        // 3. Enviar respuesta al servidor
+        const r2 = await fetch('/auth/webauthn/authenticate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(_credToJSON(credential)),
+        });
+        const d2 = await r2.json();
+        if (d2.success) { window.location.href = d2.redirect || '/dashboard'; }
+        else { showMsg(d2.message || 'Autenticación biométrica fallida', 'error'); btn.disabled = false; btn.textContent = 'Acceso biométrico'; }
+      } catch (err) {
+        if (err.name !== 'NotAllowedError') showMsg('Error: ' + err.message, 'error');
+        btn.disabled = false; btn.textContent = 'Acceso biométrico';
+      }
+    }
+
+    function showMsg(msg, type) {
+      let el = document.getElementById('loginMsg');
+      if (!el) { el = document.createElement('div'); el.id = 'loginMsg'; el.style.cssText = 'padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px;'; document.querySelector('.login-card').prepend(el); }
+      el.style.background = type === 'error' ? 'var(--error-bg)' : 'var(--success-bg)';
+      el.style.color = type === 'error' ? 'var(--error-text)' : 'var(--success-text)';
+      el.textContent = msg;
+    }
+
+    function _b64ToUint8(b64) {
+      const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from([...bin].map(c => c.charCodeAt(0)));
+    }
+
+    function _credToJSON(cred) {
+      return {
+        id: cred.id, rawId: _uint8ToB64(new Uint8Array(cred.rawId)), type: cred.type,
+        response: {
+          authenticatorData: _uint8ToB64(new Uint8Array(cred.response.authenticatorData)),
+          clientDataJSON:    _uint8ToB64(new Uint8Array(cred.response.clientDataJSON)),
+          signature:         _uint8ToB64(new Uint8Array(cred.response.signature)),
+          userHandle:        cred.response.userHandle ? _uint8ToB64(new Uint8Array(cred.response.userHandle)) : null,
+        },
+      };
+    }
+
+    function _uint8ToB64(bytes) {
+      return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+  </script>
+</body>
+</html>

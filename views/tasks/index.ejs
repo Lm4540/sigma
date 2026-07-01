@@ -1,0 +1,190 @@
+<%
+const PRIORITY_CLASS = { alta:'badge-error', media:'badge-warn', baja:'badge-neutral' };
+const STATUS_CLASS   = { pendiente:'badge-warn', completada:'badge-success', vencida:'badge-error' };
+const fmtDT = (d) => d ? new Date(d).toLocaleString('es-SV') : '—';
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/tasks' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:12px">
+        <div class="flex items-center gap-3" style="flex-wrap:wrap">
+          <span class="text-muted text-sm"><%= tasks.length %> tareas</span>
+          <% if (user.roleId !== 3) { %>
+          <form method="GET" action="/tasks" style="display:flex;align-items:center;gap:8px">
+            <select class="form-control" name="userId" style="width:180px;padding:6px 10px;font-size:13px" onchange="this.form.submit()">
+              <option value="">Todos los usuarios</option>
+              <% users.forEach(u => { %><option value="<%= u.id %>" <%= filterUserId == u.id ? 'selected' : '' %>><%= u.name %></option><% }) %>
+            </select>
+          </form>
+          <% } %>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('modalTask').classList.add('open')">+ Nueva tarea</button>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Responsable</th>
+                <th>Cliente</th>
+                <th>Vencimiento</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th style="min-width:180px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (tasks.length === 0) { %>
+              <tr><td colspan="7"><div class="empty-state"><div class="empty-state-title">Sin tareas</div></div></td></tr>
+              <% } %>
+              <% tasks.forEach(t => { %>
+              <tr>
+                <td>
+                  <div style="font-weight:500"><%= t.title %></div>
+                  <% if (t.description) { %><div class="text-muted text-sm"><%= t.description.substring(0, 60) %><%= t.description.length > 60 ? '…' : '' %></div><% } %>
+                </td>
+                <td class="text-muted"><%= t.User ? t.User.name : '—' %></td>
+                <td><% if (t.Client) { %><a href="/clients/<%= t.Client.id %>" style="color:var(--navy)"><%= t.Client.name %></a><% } else { %><span class="text-muted">—</span><% } %></td>
+                <td class="mono text-sm"><%= fmtDT(t.dueDate) %></td>
+                <td><span class="badge <%= PRIORITY_CLASS[t.priority] %>"><%= t.priority %></span></td>
+                <td><span class="badge <%= STATUS_CLASS[t.status] %>"><%= t.status %></span></td>
+                <td>
+                  <div class="flex gap-2 items-center">
+                    <% if (t.status === 'pendiente' && (user.roleId === 1 || (t.User && t.User.id === user.userId))) { %>
+                    <button class="btn btn-ghost btn-sm" onclick="completeTask(<%= t.id %>)">Completar</button>
+                    <% } %>
+                    <% if ((user.roleId === 1 || user.roleId === 2) && t.status !== 'completada') { %>
+                    <button class="btn btn-ghost btn-sm" onclick="openReassign(<%= t.id %>)" title="Reasignar">↺ Reasignar</button>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<!-- Modal reasignar tarea -->
+<% if (user.roleId === 1 || user.roleId === 2) { %>
+<div class="modal-overlay" id="modalReassign">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <span class="modal-title">Reasignar tarea</span>
+      <button class="modal-close" onclick="document.getElementById('modalReassign').classList.remove('open')">×</button>
+    </div>
+    <div style="padding:20px 24px">
+      <div class="form-group">
+        <label class="form-label">Asignar a <span>*</span></label>
+        <select class="form-control" id="reassignUserId">
+          <option value="">Seleccionar usuario…</option>
+          <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="modal-footer" style="padding-top:16px">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalReassign').classList.remove('open')">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnReassignConfirm">Reasignar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<div class="modal-overlay" id="modalTask">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Nueva tarea</span>
+      <button class="modal-close" onclick="document.getElementById('modalTask').classList.remove('open')">×</button>
+    </div>
+    <form id="formTask">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group"><label class="form-label">Título <span>*</span></label><input class="form-control" name="title" required></div>
+        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-control" name="description"></textarea></div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Fecha y hora límite <span>*</span></label>
+            <input class="form-control" type="datetime-local" name="dueDate" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prioridad</label>
+            <select class="form-control" name="priority">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+        </div>
+        <% if (user.roleId !== 3) { %>
+        <div class="form-group">
+          <label class="form-label">Asignar a</label>
+          <select class="form-control" name="userId">
+            <option value="">— yo mismo —</option>
+            <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+          </select>
+        </div>
+        <% } %>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalTask').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear tarea</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('formTask')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  const r = await fetch('/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Tarea creada' : data.message, data.success ? 'success' : 'error');
+  if (data.success) location.reload();
+});
+
+async function completeTask(id) {
+  const ok = await window.sigma.confirm('¿Marcar esta tarea como completada?', { confirmText: 'Completar' });
+  if (!ok) return;
+  const r = await fetch(`/tasks/${id}/complete`, { method: 'PATCH' });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Tarea completada' : (data.message || 'Error'), data.success ? 'success' : 'error');
+  if (data.success) location.reload();
+}
+
+// Reasignar tarea
+let _reassignTaskId = null;
+function openReassign(id) {
+  _reassignTaskId = id;
+  const sel = document.getElementById('reassignUserId');
+  if (sel) sel.value = '';
+  document.getElementById('modalReassign')?.classList.add('open');
+}
+document.getElementById('btnReassignConfirm')?.addEventListener('click', async () => {
+  const userId = document.getElementById('reassignUserId')?.value;
+  if (!userId) { window.sigma.toast('Selecciona un usuario', 'error'); return; }
+  const btn = document.getElementById('btnReassignConfirm');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(`/tasks/${_reassignTaskId}/reassign`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Tarea reasignada' : (data.message || 'Error'), data.success ? 'success' : 'error');
+    if (data.success) { document.getElementById('modalReassign').classList.remove('open'); location.reload(); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Reasignar'; }
+});
+</script>

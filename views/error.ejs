@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error <%= status %> — SIGMA</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    /* Pale Night theme */
+    :root {
+      --pn-bg:        #1b1c2e;
+      --pn-surface:   #252837;
+      --pn-surface-2: #2d2f45;
+      --pn-border:    #3b3f5c;
+      --pn-text:      #a6accd;
+      --pn-muted:     #676e95;
+      --pn-blue:      #82aaff;
+      --pn-purple:    #c792ea;
+      --pn-green:     #c3e88d;
+      --pn-orange:    #f78c6c;
+      --pn-red:       #ff5370;
+      --pn-yellow:    #ffcb6b;
+      --pn-cyan:      #89ddff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; }
+
+    body {
+      background: var(--pn-bg);
+      color: var(--pn-text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 16px 80px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { width: 100%; max-width: 820px; }
+
+    /* Header */
+    .err-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 6px;
+    }
+
+    .err-code {
+      font-size: 80px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -5px;
+      color: var(--pn-red);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .err-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--pn-red);
+      opacity: 0.7;
+    }
+
+    .err-message {
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--pn-text);
+      margin-bottom: 28px;
+      line-height: 1.4;
+    }
+
+    /* Botones */
+    .btn-row { display: flex; gap: 10px; margin-bottom: 32px; }
+
+    .btn-pn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--pn-border);
+      background: var(--pn-surface);
+      color: var(--pn-text);
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .btn-pn:hover { background: var(--pn-surface-2); border-color: var(--pn-blue); color: var(--pn-blue); }
+    .btn-pn.primary { background: var(--pn-blue); color: var(--pn-bg); border-color: var(--pn-blue); font-weight: 600; }
+    .btn-pn.primary:hover { opacity: 0.85; color: var(--pn-bg); }
+
+    /* Stack trace card */
+    .stack-card {
+      background: var(--pn-surface);
+      border: 1px solid var(--pn-border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .stack-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--pn-border);
+      background: var(--pn-surface-2);
+    }
+
+    .stack-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot.red    { background: #ff5f57; }
+    .dot.yellow { background: #febc2e; }
+    .dot.green  { background: #28c840; }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 4px;
+      border: 1px solid var(--pn-border);
+      background: transparent;
+      color: var(--pn-muted);
+      cursor: pointer;
+      transition: all 0.12s;
+      letter-spacing: 0.3px;
+    }
+    .copy-btn:hover { border-color: var(--pn-blue); color: var(--pn-blue); }
+    .copy-btn.copied { border-color: var(--pn-green); color: var(--pn-green); }
+
+    .stack-body {
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    .stack-trace {
+      font-family: 'Courier New', 'Consolas', monospace;
+      font-size: 12.5px;
+      line-height: 1.75;
+      color: var(--pn-text);
+      white-space: pre;
+    }
+
+    /* Sintaxis */
+    .tok-err  { color: var(--pn-red); font-weight: 700; }
+    .tok-at   { color: var(--pn-muted); }
+    .tok-fn   { color: var(--pn-blue); }
+    .tok-file { color: var(--pn-cyan); text-decoration: underline; text-decoration-color: rgba(137,221,255,0.3); }
+    .tok-line { color: var(--pn-yellow); }
+    .tok-col  { color: var(--pn-orange); }
+
+    /* Info badges */
+    .meta-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .meta-tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--pn-border);
+      color: var(--pn-muted);
+      font-family: 'Courier New', monospace;
+    }
+    .meta-tag.status { border-color: var(--pn-red); color: var(--pn-red); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="err-header">
+      <div class="err-code"><%= status %></div>
+      <div class="err-label">Error</div>
+    </div>
+
+    <div class="err-message"><%= message %></div>
+
+    <div class="meta-row">
+      <span class="meta-tag status">HTTP <%= status %></span>
+      <span class="meta-tag">SIGMA v2</span>
+      <span class="meta-tag">El Salvador · UTC-6</span>
+    </div>
+
+    <div class="btn-row">
+      <a href="javascript:history.back()" class="btn-pn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 2L3 6l4 4"/></svg>
+        Volver
+      </a>
+      <a href="/dashboard" class="btn-pn primary">Dashboard</a>
+    </div>
+
+    <% if (locals.stack) { %>
+    <div class="stack-card">
+      <div class="stack-toolbar">
+        <div class="stack-dots">
+          <div class="dot red"></div>
+          <div class="dot yellow"></div>
+          <div class="dot green"></div>
+        </div>
+        <button class="copy-btn" id="copyBtn" onclick="copyStack()">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3a1.5 1.5 0 00-1.5-1.5h-6A1.5 1.5 0 002 3v6A1.5 1.5 0 003.5 10.5H5"/></svg>
+          Copiar
+        </button>
+      </div>
+      <div class="stack-body">
+        <div class="stack-trace" id="stackTrace"></div>
+      </div>
+    </div>
+
+    <script>
+      const RAW_STACK = <%- JSON.stringify(locals.stack) %>;
+
+      function esc(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      function colorize(raw) {
+        return raw.split('\n').map((line, i) => {
+          if (i === 0) {
+            return `<span class="tok-err">${esc(line)}</span>`;
+          }
+
+          // Líneas "at ..."
+          const atMatch = line.match(/^(\s*at\s+)(.+?)(\s+\()(.+):(\d+):(\d+)(\))$/);
+          if (atMatch) {
+            return `<span class="tok-at">${esc(atMatch[1])}<span class="tok-fn">${esc(atMatch[2])}</span>${esc(atMatch[3])}<span class="tok-file">${esc(atMatch[4])}</span>:<span class="tok-line">${atMatch[5]}</span>:<span class="tok-col">${atMatch[6]}</span>${esc(atMatch[7])}</span>`;
+          }
+
+          // Líneas "at ..." sin función nombrada
+          const atSimple = line.match(/^(\s*at\s+)(.+):(\d+):(\d+)$/);
+          if (atSimple) {
+            return `<span class="tok-at">${esc(atSimple[1])}<span class="tok-file">${esc(atSimple[2])}</span>:<span class="tok-line">${atSimple[3]}</span>:<span class="tok-col">${atSimple[4]}</span></span>`;
+          }
+
+          return `<span class="tok-at">${esc(line)}</span>`;
+        }).join('\n');
+      }
+
+      document.getElementById('stackTrace').innerHTML = colorize(RAW_STACK);
+
+      function copyStack() {
+        navigator.clipboard.writeText(RAW_STACK).then(() => {
+          const btn = document.getElementById('copyBtn');
+          btn.classList.add('copied');
+          btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8l4 4 8-8"/></svg> Copiado`;
+          setTimeout(() => {
+            btn.classList.remove('copied');
+            btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3a1.5 1.5 0 00-1.5-1.5h-6A1.5 1.5 0 002 3v6A1.5 1.5 0 003.5 10.5H5"/></svg> Copiar`;
+          }, 2000);
+        });
+      }
+    </script>
+    <% } %>
+
+  </div>
+</body>
+</html>

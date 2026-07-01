@@ -1,0 +1,80 @@
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/assignments' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Dirección</th>
+                <th>Código / Préstamo</th>
+                <th>Categoría</th>
+                <th style="text-align:right">Días mora</th>
+                <th>Gestor actual</th>
+                <th>Asignado el</th>
+                <th>Reasignar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% clients.forEach(c => { %>
+              <tr>
+                <td><a href="/clients/<%= c.id %>" style="font-weight:500;color:var(--navy);text-decoration:none"><%= c.name %></a></td>
+                <td class="text-muted text-sm" style="max-width:180px"><% if (c.address) { %><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= c.address %>"><%= c.address %></span><% } else { %>—<% } %></td>
+                <td>
+                  <div class="mono text-sm"><%= c.clientCode || '' %></div>
+                  <div class="mono text-sm text-muted"><%= c.loanNumber || '' %></div>
+                </td>
+                <td><span class="risk-chip <%= c.riskCategory %>"><%= c.riskCategory %></span></td>
+                <td style="text-align:right" class="mono"><%= c.daysLate %></td>
+                <td>
+                  <% if (c.gestorName) { %>
+                    <span style="font-weight:500"><%= c.gestorName %></span>
+                  <% } else { %>
+                    <span class="badge badge-warn">Sin asignar</span>
+                  <% } %>
+                </td>
+                <td class="text-muted"><%= c.assignedAt ? new Date(c.assignedAt).toLocaleDateString('es-SV') : '—' %></td>
+                <td>
+                  <div class="flex gap-2 items-center">
+                    <select class="form-control" style="width:160px;padding:4px 8px;font-size:12px" id="sel-<%= c.id %>">
+                      <option value="">Seleccionar...</option>
+                      <% gestores.forEach(g => { %>
+                      <option value="<%= g.id %>"><%= g.name %></option>
+                      <% }) %>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="assign(<%= c.id %>)">Asignar</button>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<script>
+async function assign(clientId) {
+  const userId = document.getElementById(`sel-${clientId}`).value;
+  if (!userId) return window.sigma.toast('Selecciona un gestor', 'error');
+  try {
+    const r = await fetch('/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, userId }),
+    });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Cliente asignado correctamente' : data.message, data.success ? 'success' : 'error');
+    if (data.success) setTimeout(() => location.reload(), 1000);
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+</script>

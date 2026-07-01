@@ -1,0 +1,141 @@
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/users' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <div class="flex justify-between items-center mb-6">
+        <span class="text-muted text-sm"><%= users.length %> usuarios</span>
+        <button class="btn btn-primary" onclick="document.getElementById('modalNewUser').classList.add('open')">
+          + Nuevo usuario
+        </button>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Sucursal</th>
+                <th>Estado</th>
+                <th>Intentos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(u => { %>
+              <tr>
+                <td>
+                  <div style="font-weight:500"><%= u.name %></div>
+                  <div class="text-muted text-sm"><%= u.email %></div>
+                </td>
+                <td><span class="badge badge-info"><%= u.role ? u.role.name : '—' %></span></td>
+                <td class="text-muted"><%= u.branch ? u.branch.name : '—' %></td>
+                <td>
+                  <span class="badge <%= u.status === 'on' ? 'badge-success' : 'badge-error' %>">
+                    <%= u.status === 'on' ? 'Activo' : 'Inactivo' %>
+                  </span>
+                </td>
+                <td class="mono text-sm"><%= u.loginAttempts %>/5<% if (u.lockUntil) { %> <span class="badge badge-error">Bloqueado</span><% } %></td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="btn btn-ghost btn-sm" onclick="toggleUser(<%= u.id %>, '<%= u.status %>')">
+                      <%= u.status === 'on' ? 'Desactivar' : 'Activar' %>
+                    </button>
+                    <% if (u.lockUntil || u.loginAttempts >= 5) { %>
+                    <button class="btn btn-amber btn-sm" onclick="unlockUser(<%= u.id %>)">Desbloquear</button>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<!-- Modal nuevo usuario -->
+<div class="modal-overlay" id="modalNewUser">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo usuario</span>
+      <button class="modal-close" onclick="document.getElementById('modalNewUser').classList.remove('open')">×</button>
+    </div>
+    <form id="formNewUser">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group">
+          <label class="form-label">Nombre completo <span>*</span></label>
+          <input class="form-control" type="text" name="name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo electrónico <span>*</span></label>
+          <input class="form-control" type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña temporal <span>*</span></label>
+          <input class="form-control" type="password" name="password" required minlength="8">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Rol <span>*</span></label>
+            <select class="form-control" name="roleId" required>
+              <% roles.forEach(r => { %><option value="<%= r.id %>"><%= r.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sucursal</label>
+            <select class="form-control" name="branchId">
+              <option value="">— ninguna —</option>
+              <% branches.forEach(b => { %><option value="<%= b.id %>"><%= b.name %></option><% }) %>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalNewUser').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear usuario</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('formNewUser').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  const r = await fetch('/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Usuario creado' : data.message, data.success ? 'success' : 'error');
+  if (data.success) setTimeout(() => location.reload(), 1000);
+});
+
+async function toggleUser(id, currentStatus) {
+  const isActive = currentStatus === 'on';
+  const ok = await window.sigma.confirm(
+    isActive ? '¿Desactivar este usuario? No podrá iniciar sesión.' : '¿Activar este usuario?',
+    { confirmText: isActive ? 'Desactivar' : 'Activar', danger: isActive }
+  );
+  if (!ok) return;
+  const r = await fetch(`/users/${id}/status`, { method: 'PATCH' });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Estado actualizado' : 'Error', data.success ? 'success' : 'error');
+  if (data.success) location.reload();
+}
+
+async function unlockUser(id) {
+  const ok = await window.sigma.confirm('¿Desbloquear esta cuenta y restablecer los intentos fallidos?', { confirmText: 'Desbloquear' });
+  if (!ok) return;
+  const r = await fetch(`/users/${id}/unlock`, { method: 'PATCH' });
+  const data = await r.json();
+  window.sigma.toast(data.success ? 'Cuenta desbloqueada' : 'Error', data.success ? 'success' : 'error');
+  if (data.success) location.reload();
+}
+</script>

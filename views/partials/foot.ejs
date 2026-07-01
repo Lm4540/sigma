@@ -1,0 +1,184 @@
+  </div><!-- /.main-content -->
+</div><!-- /.app-shell -->
+
+<div id="toast-container"></div>
+
+<!-- Modal global: cambiar contraseña -->
+<div class="modal-overlay" id="modalChangePw">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">Cambiar contraseña</span>
+      <button class="modal-close" onclick="document.getElementById('modalChangePw').classList.remove('open')">×</button>
+    </div>
+    <form id="formChangePw" novalidate>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Contraseña actual <span>*</span></label>
+          <input class="form-control" type="password" name="currentPassword" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña <span>*</span></label>
+          <input class="form-control" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar nueva contraseña <span>*</span></label>
+          <input class="form-control" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalChangePw').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnChangePw">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (locals.webAuthnEnabled === false && typeof user !== 'undefined') { %>
+<!-- Modal global: habilitar biometría -->
+<div class="modal-overlay" id="modalBiometric">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">Acceso biométrico</span>
+      <button class="modal-close" onclick="document.getElementById('modalBiometric').classList.remove('open')">×</button>
+    </div>
+    <div style="padding:20px 24px">
+      <p style="color:var(--ink-2);margin-bottom:20px">Habilita huella o Face ID para entrar más rápido sin escribir tu contraseña.</p>
+      <div class="modal-footer" style="padding:0">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalBiometric').classList.remove('open')">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnEnableBiometric">Habilitar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<script src="/js/sync.js"></script>
+<script src="/js/img.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+// Alternar modo oscuro / claro
+(function () {
+  const KEY = 'sigma-theme';
+  const html = document.documentElement;
+
+  function applyTheme(t) {
+    if (t === 'dark') {
+      html.dataset.theme = 'dark';
+    } else {
+      delete html.dataset.theme;
+    }
+    const sun  = document.getElementById('iconSun');
+    const moon = document.getElementById('iconMoon');
+    if (sun && moon) {
+      sun.style.display  = t === 'dark' ? 'none'   : '';
+      moon.style.display = t === 'dark' ? ''        : 'none';
+    }
+  }
+
+  // Sincronizar iconos con el tema ya aplicado por el script en <head>
+  const current = html.dataset.theme === 'dark' ? 'dark' : 'light';
+  applyTheme(current);
+
+  document.getElementById('themeToggle')?.addEventListener('click', function () {
+    const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(KEY, next);
+    applyTheme(next);
+  });
+})();
+</script>
+<script>
+// Eliminar credenciales biométricas guardadas
+async function clearBiometrics() {
+  const ok = await window.sigma?.confirm('¿Quitar el acceso biométrico? Tendrás que volver a registrar tu huella o Face ID para usarlo.', { confirmText: 'Quitar', danger: true });
+  if (!ok) return;
+  try {
+    const r = await fetch('/auth/webauthn/credentials', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    window.sigma.toast(d.success ? 'Biometría eliminada' : (d.message || 'Error'), d.success ? 'success' : 'error');
+    if (d.success) setTimeout(() => location.reload(), 1000);
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+
+document.getElementById('formChangePw')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd   = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  if (body.newPassword !== body.confirmPassword) {
+    window.sigma.toast('Las contraseñas no coinciden', 'error');
+    return;
+  }
+  const btn = document.getElementById('btnChangePw');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    const r    = await fetch('/users/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: body.currentPassword, newPassword: body.newPassword }) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Contraseña actualizada. Iniciando sesión de nuevo...', 'success');
+      setTimeout(() => { window.location.href = data.redirect || '/login'; }, 1500);
+    } else {
+      window.sigma.toast(data.message || 'Error al cambiar contraseña', 'error');
+      btn.disabled = false; btn.textContent = 'Guardar';
+    }
+  } catch {
+    window.sigma.toast('Error de conexión', 'error');
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+});
+</script>
+
+<% if (locals.webAuthnEnabled === false && typeof user !== 'undefined') { %>
+<script>
+function _waB64(s) { const b = atob(s.replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...b].map(c=>c.charCodeAt(0))); }
+function _waU8B64(u) { return btoa(String.fromCharCode(...u)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
+
+async function _registerBiometric() {
+  const btn = document.getElementById('btnEnableBiometric');
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
+  try {
+    const r1 = await fetch('/auth/webauthn/register-options', { method: 'POST' });
+    const { success, options } = await r1.json();
+    if (!success) throw new Error('No se pudieron obtener opciones');
+
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        ...options,
+        challenge: _waB64(options.challenge),
+        user: { ...options.user, id: _waB64(options.user.id) },
+        excludeCredentials: (options.excludeCredentials || []).map(c => ({ ...c, id: _waB64(c.id) })),
+      }
+    });
+
+    const r2 = await fetch('/auth/webauthn/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: cred.id, rawId: _waU8B64(new Uint8Array(cred.rawId)), type: cred.type,
+        response: {
+          clientDataJSON:    _waU8B64(new Uint8Array(cred.response.clientDataJSON)),
+          attestationObject: _waU8B64(new Uint8Array(cred.response.attestationObject)),
+        },
+      }),
+    });
+    const d2 = await r2.json();
+    document.getElementById('modalBiometric')?.classList.remove('open');
+    window.sigma.toast(d2.success ? 'Biometría registrada correctamente' : (d2.message || 'Error al registrar'), d2.success ? 'success' : 'error');
+  } catch (e) {
+    if (e.name !== 'NotAllowedError') window.sigma?.toast('Error al registrar biometría: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Habilitar'; }
+  }
+}
+
+document.getElementById('btnEnableBiometric')?.addEventListener('click', _registerBiometric);
+
+// Mostrar botón en sidebar solo si el navegador soporta biometría
+if (window.PublicKeyCredential && navigator.credentials) {
+  window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(available => {
+    if (available) {
+      document.getElementById('btnBiometricSidebar')?.removeAttribute('hidden');
+    }
+  }).catch(() => {});
+}
+</script>
+<% } %>
+</body>
+</html>

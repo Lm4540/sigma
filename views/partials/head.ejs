@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a2744">
+  <title><%= title %> — SIGMA</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json">
+  <!-- Evitar flash de tema incorrecto — debe ejecutar antes de pintar -->
+  <script>
+    (function() {
+      var t = localStorage.getItem('sigma-theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.dataset.theme = 'dark';
+      }
+    })();
+    window.SIGMA_IMG_MAX_PX  = <%= locals.IMG_MAX_PX  || 1200 %>;
+    window.SIGMA_IMG_QUALITY = <%= locals.IMG_QUALITY || 0.8 %>;
+  </script>
+  <script src="/socket.io/socket.io.js" defer></script>
+</head>
+<body>
+<div class="app-shell">

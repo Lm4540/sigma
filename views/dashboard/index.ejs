@@ -1,0 +1,115 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const riskMap = {};
+(riskDist || []).forEach(r => { riskMap[r.riskCategory] = parseInt(r.total); });
+const totalCartera = Object.values(riskMap).reduce((a, b) => a + b, 0);
+const riskRows = [
+  ['A1', '0 – 14 días mora'],
+  ['A2', '15 – 30 días mora'],
+  ['B',  '31 – 90 días mora'],
+  ['C',  '91 – 180 días mora'],
+  ['D',  '181 – 270 días mora'],
+  ['E',  '> 270 días mora'],
+];
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/dashboard' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Gestiones hoy</div>
+          <div class="stat-value"><%= todayStats.total || 0 %></div>
+          <div class="stat-sub"><%= todayStats.withPayment || 0 %> con pago reportado</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Recaudado hoy</div>
+          <div class="stat-value amber">$ <%- fmt(todayStats.totalAmount) %></div>
+          <div class="stat-sub">USD</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pagos por autorizar</div>
+          <div class="stat-value <%= (pendingPayments.total || 0) > 0 ? 'amber' : '' %>"><%= pendingPayments.total || 0 %></div>
+          <div class="stat-sub">$ <%- fmt(pendingPayments.totalAmount) %> en espera</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total cartera</div>
+          <div class="stat-value navy"><%= totalCartera.toLocaleString('es-SV') %></div>
+          <div class="stat-sub">clientes en sistema</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Distribución de Riesgo — NCB-022</span>
+            <% if ((pendingPayments.total || 0) > 0) { %>
+              <a href="/collections/pending" class="btn btn-amber btn-sm">Ver pagos</a>
+            <% } %>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cat.</th>
+                  <th>Criterio</th>
+                  <th style="text-align:right">Clientes</th>
+                  <th style="text-align:right">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% riskRows.forEach(([cat, criteria]) => {
+                  const count = riskMap[cat] || 0;
+                  const pct = totalCartera > 0 ? ((count / totalCartera) * 100).toFixed(1) : '0.0';
+                %>
+                <tr>
+                  <td><span class="risk-chip <%= cat %>"><%= cat %></span></td>
+                  <td class="text-muted" style="font-size:11px"><%= criteria %></td>
+                  <td style="text-align:right" class="mono"><%= count.toLocaleString('es-SV') %></td>
+                  <td style="text-align:right" class="mono"><%= pct %>%</td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Mayor saldo pendiente</span>
+            <a href="/clients" class="btn btn-ghost btn-sm">Ver todos</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Cat.</th>
+                  <th style="text-align:right">Mora</th>
+                  <th style="text-align:right">Deuda</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% (topDebt || []).forEach(c => { %>
+                <tr>
+                  <td><a href="/clients/<%= c.id %>" style="color:inherit;text-decoration:none"><%= c.name %></a></td>
+                  <td><span class="risk-chip <%= c.riskCategory %>"><%= c.riskCategory %></span></td>
+                  <td style="text-align:right" class="mono"><%= c.daysLate %>d</td>
+                  <td style="text-align:right" class="mono amber">$ <%- fmt(c.totalDeuda) %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>

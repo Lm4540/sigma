@@ -1,0 +1,238 @@
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/clients' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Barra superior: búsqueda + acciones -->
+      <div class="flex items-center gap-3 mb-6">
+        <form method="GET" action="/clients" class="search-wrap flex-1" style="max-width:380px" id="formClientSearch">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
+          <input class="form-control" type="text" name="q" id="inputClientSearch" value="<%= q %>" placeholder="Buscar por nombre, código o préstamo…" autocomplete="off">
+          <button type="submit" class="btn btn-primary btn-sm" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:4px 10px">Buscar</button>
+        </form>
+
+        <% if (user.roleId === 1 || user.roleId === 2) { %>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalNewClient').classList.add('open')">+ Nuevo cliente</button>
+        <div style="position:relative;display:inline-block">
+          <label class="btn btn-ghost btn-sm" for="importFile" style="cursor:pointer">Importar Excel</label>
+          <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importClients(this)">
+        </div>
+        <a class="btn btn-ghost btn-sm" href="/templates/cliente_importacion_ejemplo.xlsx" download style="display:inline-flex;align-items:center;gap:6px" title="Descargar plantilla de ejemplo Excel">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px"><path d="M3 2h7l4 4v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M10 2v4h4"/><path d="M5 8h6M5 11h3M8 11v3"/></svg>
+          Descargar Plantilla
+        </a>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('panelColumns').hidden=!document.getElementById('panelColumns').hidden" title="Ver columnas del Excel" style="padding:6px 8px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 7v4"/><circle cx="8" cy="5" r=".5" fill="currentColor"/></svg>
+        </button>
+        <% } %>
+      </div>
+
+      <% if (user.roleId === 1 || user.roleId === 2) { %>
+      <!-- Panel columnas Excel -->
+      <div id="panelColumns" hidden class="card mb-4" style="padding:16px 20px">
+        <div style="font-weight:600;margin-bottom:10px;font-size:13px">Columnas esperadas en el archivo Excel</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;font-size:12px">
+          <div><span class="mono" style="color:var(--navy)">clientCode</span> <span class="text-muted">o</span> <span class="mono">Código</span> — Código del cliente</div>
+          <div><span class="mono" style="color:var(--navy)">loanNumber</span> <span class="text-muted">o</span> <span class="mono">Préstamo</span> — Número de préstamo</div>
+          <div><span class="mono" style="color:var(--navy)">name</span> <span class="text-muted">o</span> <span class="mono">Nombre</span> — Nombre completo</div>
+          <div><span class="mono" style="color:var(--navy)">address</span> <span class="text-muted">o</span> <span class="mono">Dirección</span> — Dirección</div>
+          <div><span class="mono" style="color:var(--navy)">balance</span> <span class="text-muted">o</span> <span class="mono">Saldo</span> — Saldo pendiente (USD)</div>
+          <div><span class="mono" style="color:var(--navy)">insurance</span> <span class="text-muted">o</span> <span class="mono">Seguro</span> — Seguro (USD)</div>
+          <div><span class="mono" style="color:var(--navy)">otherFees</span> <span class="text-muted">o</span> <span class="mono">OtrosCargos</span> — Otros cargos (USD)</div>
+          <div><span class="mono" style="color:var(--navy)">daysLate</span> <span class="text-muted">o</span> <span class="mono">DiasMora</span> — Días en mora</div>
+          <div><span class="mono" style="color:var(--navy)">nextPaymentDate</span> <span class="text-muted">o</span> <span class="mono">ProximoPago</span> — Fecha próximo pago (YYYY-MM-DD)</div>
+        </div>
+        <p class="text-muted text-sm" style="margin-top:10px;margin-bottom:0">Si <span class="mono">clientCode</span> o <span class="mono">loanNumber</span> ya existe, se actualizan los montos. De lo contrario se crea un cliente nuevo.</p>
+      </div>
+      <% } %>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Código / Préstamo</th>
+                <th>Categoría</th>
+                <th style="text-align:right">Días mora</th>
+                <th style="text-align:right">Saldo</th>
+                <th>Próx. pago</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (clients.length === 0) { %>
+              <tr>
+                <td colspan="7">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <div class="empty-state-title">Sin clientes</div>
+                    <div class="empty-state-desc">No se encontraron resultados para "<%= q %>"</div>
+                  </div>
+                </td>
+              </tr>
+              <% } %>
+              <% clients.forEach(c => { %>
+              <tr>
+                <td>
+                  <div style="font-weight:500"><%= c.name %></div>
+                  <% if (c.address) { %><div class="text-muted text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= c.address %></div><% } %>
+                </td>
+                <td>
+                  <% if (c.clientCode) { %><div class="mono"><%= c.clientCode %></div><% } %>
+                  <% if (c.loanNumber) { %><div class="mono text-muted"><%= c.loanNumber %></div><% } %>
+                </td>
+                <td><span class="risk-chip <%= c.riskCategory %>"><%= c.riskCategory %></span></td>
+                <td style="text-align:right">
+                  <span class="mono <%= parseInt(c.daysLate) > 90 ? 'badge badge-error' : '' %>">
+                    <%= c.daysLate %>
+                  </span>
+                </td>
+                <td style="text-align:right" class="mono">$ <%= parseFloat(c.balance || 0).toLocaleString('es-SV', {minimumFractionDigits:2}) %></td>
+                <td class="text-muted"><%= c.nextPaymentDate || '—' %></td>
+                <td>
+                  <a href="/clients/<%= c.id %>" class="btn btn-ghost btn-sm">Ver ficha</a>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Paginación -->
+        <% if (totalPages > 1) { %>
+        <div class="pagination" style="padding: 16px 20px; border-top: 1px solid var(--border-2)">
+          <% if (page > 1) { %>
+            <a href="/clients?q=<%= q %>&page=<%= page - 1 %>" class="page-btn">‹</a>
+          <% } %>
+          <% for (let p = 1; p <= totalPages; p++) { %>
+            <a href="/clients?q=<%= q %>&page=<%= p %>" class="page-btn <%= p === page ? 'active' : '' %>"><%= p %></a>
+          <% } %>
+          <% if (page < totalPages) { %>
+            <a href="/clients?q=<%= q %>&page=<%= page + 1 %>" class="page-btn">›</a>
+          <% } %>
+          <span class="text-muted text-sm" style="margin-left:8px"><%= total %> clientes</span>
+        </div>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<% if (user.roleId === 1 || user.roleId === 2) { %>
+<div class="modal-overlay" id="modalNewClient">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo cliente</span>
+      <button class="modal-close" onclick="document.getElementById('modalNewClient').classList.remove('open')">×</button>
+    </div>
+    <form id="formNewClient">
+      <div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
+        <div class="form-group">
+          <label class="form-label">Nombre completo <span>*</span></label>
+          <input class="form-control" name="name" required>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Código de cliente</label>
+            <input class="form-control" name="clientCode" placeholder="Ej. CLI-001">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Número de préstamo</label>
+            <input class="form-control" name="loanNumber" placeholder="Ej. PREST-2024-001">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dirección</label>
+          <input class="form-control" name="address">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Saldo (USD)</label>
+            <input class="form-control" type="number" step="0.01" min="0" name="balance" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Días mora</label>
+            <input class="form-control" type="number" min="0" name="daysLate" value="0">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Seguro (USD)</label>
+            <input class="form-control" type="number" step="0.01" min="0" name="insurance" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Otros cargos (USD)</label>
+            <input class="form-control" type="number" step="0.01" min="0" name="otherFees" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Próximo pago</label>
+          <input class="form-control" type="date" name="nextPaymentDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalNewClient').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnCreateClient">Crear cliente</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<script>
+// Crear cliente manual
+document.getElementById('formNewClient')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnCreateClient');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const body = Object.fromEntries(new FormData(e.target));
+    const r    = await fetch('/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Cliente creado correctamente', 'success');
+      document.getElementById('modalNewClient').classList.remove('open');
+      setTimeout(() => location.href = `/clients/${data.data.id}`, 1000);
+    } else {
+      window.sigma.toast(data.message || 'Error al crear cliente', 'error');
+    }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear cliente'; }
+});
+
+// Búsqueda en tiempo real con debounce de 400ms
+(function() {
+  const input = document.getElementById('inputClientSearch');
+  const form  = document.getElementById('formClientSearch');
+  if (!input || !form) return;
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    // Envía si hay al menos 2 caracteres o si se borra todo
+    timer = setTimeout(() => {
+      if (input.value.length >= 2 || input.value.length === 0) form.submit();
+    }, 400);
+  });
+})();
+
+async function importClients(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const btn = document.querySelector('label[for="importFile"]');
+  btn.textContent = 'Importando…';
+  try {
+    const r = await fetch('/clients/import', { method: 'POST', body: fd });
+    const data = await r.json();
+    window.sigma.toast(data.message, data.success ? 'success' : 'error');
+    if (data.success) setTimeout(() => location.reload(), 1500);
+  } catch { window.sigma.toast('Error al importar', 'error'); }
+  finally { btn.textContent = 'Importar Excel'; input.value = ''; }
+}
+</script>

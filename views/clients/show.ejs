@@ -1,0 +1,538 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-SV') : '—';
+const fmtDT   = (d) => d ? new Date(d).toLocaleString('es-SV')     : '—';
+const TYPE_ICON = { Visita:'📍', Llamada:'📞', WhatsApp:'💬', Mensaje:'✉️' };
+const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', rechazado:'badge-error', aplicado:'badge-info' };
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/clients' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Encabezado del cliente -->
+      <div class="card mb-6">
+        <div class="flex items-center gap-4">
+          <div style="flex:1">
+            <div class="flex items-center gap-3 mb-2">
+              <h1 style="font-size:18px;font-weight:700;color:var(--ink-1)"><%= client.name %></h1>
+              <span class="risk-chip <%= client.riskCategory %>"><%= client.riskCategory %></span>
+            </div>
+            <div class="flex gap-4 text-muted text-sm">
+              <% if (client.clientCode) { %><span>Código: <span class="mono"><%= client.clientCode %></span></span><% } %>
+              <% if (client.loanNumber) { %><span>Préstamo: <span class="mono"><%= client.loanNumber %></span></span><% } %>
+              <% if (client.address) { %><span><%= client.address %></span><% } %>
+            </div>
+          </div>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <% if (user.roleId === 1 || user.roleId === 2 || user.roleId === 3) { %>
+            <button class="btn btn-ghost" onclick="document.getElementById('modalClientTask').classList.add('open')">+ Nueva tarea</button>
+            <% } %>
+            <% if ((user.roleId === 1 || user.roleId === 2) && !legalCase) { %>
+            <button class="btn btn-ghost" style="color:var(--error-text)" onclick="escalateToLegal()">⚖️ Escalar a proceso legal</button>
+            <% } %>
+            <% if ((user.roleId === 1 || user.roleId === 2) && legalCase) { %>
+            <a href="/legal/<%= legalCase.id %>" class="btn btn-ghost" style="color:var(--amber)">⚖️ Ver proceso legal</a>
+            <% } %>
+            <% if (user.roleId === 3) { %>
+            <button class="btn btn-primary" onclick="openNewGestion()">Nueva gestión</button>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-6">
+        <!-- Datos financieros -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Situación financiera</span></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="flex justify-between">
+              <span class="text-muted">Saldo capital</span>
+              <span class="mono" style="font-weight:600">$ <%= fmt(client.balance) %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Seguros</span>
+              <span class="mono">$ <%= fmt(client.insurance) %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Otros cargos</span>
+              <span class="mono">$ <%= fmt(client.otherFees) %></span>
+            </div>
+            <div class="flex justify-between" style="padding-top:8px;border-top:1px solid var(--border-2)">
+              <span style="font-weight:600">Total</span>
+              <span class="mono" style="font-weight:700;color:var(--navy)">$ <%= fmt((parseFloat(client.balance||0) + parseFloat(client.insurance||0) + parseFloat(client.otherFees||0))) %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Días de mora</span>
+              <span class="mono <%= parseInt(client.daysLate) > 90 ? 'badge badge-error' : '' %>"><%= client.daysLate %> días</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Próximo pago</span>
+              <span><%= fmtDate(client.nextPaymentDate) %></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gestor asignado -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Gestor asignado</span></div>
+          <% if (activeAssignment) { %>
+          <div style="font-size:15px;font-weight:600;color:var(--ink-1);margin-bottom:8px">
+            <%= activeAssignment.gestor ? activeAssignment.gestor.name : '—' %>
+          </div>
+          <div class="text-muted text-sm">Asignado el <%= fmtDate(activeAssignment.assignedAt) %></div>
+          <% } else { %>
+          <div class="text-muted">Sin gestor asignado</div>
+          <% } %>
+
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-2)">
+            <div class="flex justify-between" style="margin-bottom:8px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-3)">Contactos (<%= contacts.length %>)</div>
+              <% if (user.roleId === 1 || user.roleId === 2) { %>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalAddContact').classList.add('open')" style="font-size:11px;padding:2px 8px">+ Agregar</button>
+              <% } %>
+            </div>
+            <% if (contacts.length === 0) { %>
+            <div class="text-muted text-sm">Sin contactos registrados</div>
+            <% } %>
+            <% contacts.forEach(c => { %>
+            <div class="flex justify-between text-sm" style="padding:5px 0;border-bottom:1px solid var(--border-2)">
+              <span><%= c.name || 'Contacto' %> <span class="text-muted">(<%= c.relationship || '' %>)</span></span>
+              <span class="flex items-center gap-2">
+                <span class="mono"><%= c.phone %></span>
+                <% if (user.roleId === 1) { %>
+                <button onclick="deleteContact(<%= c.id %>)" style="background:none;border:none;cursor:pointer;color:var(--error-text);font-size:13px;padding:0 2px;line-height:1" title="Eliminar">✕</button>
+                <% } %>
+              </span>
+            </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tareas vinculadas al cliente -->
+      <% if (clientTasks && clientTasks.length > 0) { %>
+      <%
+        const TASK_STATUS_CLASS = { pendiente:'badge-warn', completada:'badge-success', vencida:'badge-error' };
+        const TASK_PRIORITY_CLASS = { alta:'badge-error', media:'badge-warn', baja:'badge-neutral' };
+      %>
+      <div class="card mb-6" style="padding:0">
+        <div class="card-header" style="padding:16px 20px">
+          <span class="card-title">Tareas (<%= clientTasks.length %>)</span>
+          <a href="/tasks" class="btn btn-ghost btn-sm">Ver todas</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Responsable</th>
+                <th>Vencimiento</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% clientTasks.forEach(t => { %>
+              <tr>
+                <td style="font-weight:500"><%= t.title %></td>
+                <td class="text-muted"><%= t.User ? t.User.name : '—' %></td>
+                <td class="mono text-sm"><%= t.dueDate ? new Date(t.dueDate).toLocaleDateString('es-SV') : '—' %></td>
+                <td><span class="badge <%= TASK_PRIORITY_CLASS[t.priority] %>"><%= t.priority %></span></td>
+                <td><span class="badge <%= TASK_STATUS_CLASS[t.status] %>"><%= t.status %></span></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- Historial de gestiones -->
+      <div class="card" style="padding:0">
+        <div class="card-header" style="padding:20px">
+          <span class="card-title">Historial de gestiones (<%= logs.length %>)</span>
+        </div>
+        <% if (logs.length === 0) { %>
+        <div class="empty-state"><div class="empty-state-title">Sin gestiones registradas</div></div>
+        <% } %>
+        <% logs.forEach(log => { %>
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border-2);display:flex;gap:12px">
+          <div style="font-size:18px;flex-shrink:0;line-height:1.5"><%= TYPE_ICON[log.type] || '📌' %></div>
+          <div style="flex:1">
+            <div class="flex items-center gap-2 mb-1">
+              <span style="font-size:12px;font-weight:600;color:var(--ink-2)"><%= log.type %></span>
+              <% if (log.paymentAmount) { %>
+                <span class="badge <%= STATUS_CLASS[log.status] || 'badge-neutral' %>"><%= log.status %></span>
+                <span class="mono" style="font-size:12px;color:var(--amber);font-weight:600">$ <%= fmt(log.paymentAmount) %> (<%= ({efectivo:'Efectivo',especie:'Especie',cheque:'Cheque',transferencia:'Transferencia'})[log.paymentType] || log.paymentType %>)</span>
+              <% } %>
+              <span class="text-muted text-sm" style="margin-left:auto"><%= fmtDT(log.createdAt) %></span>
+            </div>
+            <div style="color:var(--ink-2);font-size:13px"><%= log.comment %></div>
+            <% if (log.gestor) { %>
+            <div class="text-muted text-sm" style="margin-top:4px">Gestor: <%= log.gestor.name %></div>
+            <% } %>
+            <% if (log.evidenceUrl) { %>
+            <div style="margin-top:8px">
+              <a href="<%= log.evidenceUrl %>" target="_blank" class="btn btn-ghost btn-sm">Ver evidencia</a>
+            </div>
+            <% } %>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<!-- Banner offline -->
+<div id="offlineBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:#c97c1a;color:#fff;font-size:13px;font-weight:600">
+  <span>📡</span>
+  <span>Sin conexión — las gestiones se guardarán localmente y se sincronizarán al recuperar la red</span>
+</div>
+
+<!-- Modal nueva gestión (solo gestor) -->
+<% if (user.roleId === 3) { %>
+<div class="modal-overlay" id="gestionModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Registrar gestión</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <form id="gestionForm" enctype="multipart/form-data">
+      <input type="hidden" name="clientId" value="<%= client.id %>">
+      <div class="form-stack" style="display:flex;flex-direction:column;gap:16px">
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Tipo <span>*</span></label>
+            <select class="form-control" name="type" id="gType" required onchange="toggleGPS()">
+              <option value="">Seleccionar...</option>
+              <option value="Visita">📍 Visita</option>
+              <option value="Llamada">📞 Llamada</option>
+              <option value="WhatsApp">💬 WhatsApp</option>
+              <option value="Mensaje">✉️ Mensaje</option>
+            </select>
+          </div>
+          <div class="form-group" id="gpsStatus" style="display:none">
+            <label class="form-label">GPS</label>
+            <div class="form-control" id="gpsDisplay" style="background:var(--surface-3);color:var(--ink-3);font-size:12px">
+              Obteniendo ubicación...
+            </div>
+            <input type="hidden" id="latitude" name="latitude">
+            <input type="hidden" id="longitude" name="longitude">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Comentario <span>*</span></label>
+          <textarea class="form-control" name="comment" required placeholder="Descripción de la gestión..."></textarea>
+        </div>
+        <div id="paymentSection" style="display:none;padding:16px;background:var(--surface-2);border-radius:var(--r-md);display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--ink-2)">Pago reportado (opcional)</div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Monto (USD)</label>
+              <input class="form-control" type="number" name="paymentAmount" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo de pago</label>
+              <select class="form-control" name="paymentType">
+                <option value="">— ninguno —</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="especie">Especie</option>
+                <option value="cheque">Cheque</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Foto de evidencia</label>
+            <input class="form-control" type="file" name="evidence" accept="image/*" capture="environment">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" onchange="document.getElementById('paymentSection').style.display=this.checked?'flex':'none'">
+          Registrar pago
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="gSubmit">Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ── Estado offline ─────────────────────────────────────── */
+const offlineBanner = document.getElementById('offlineBanner');
+const updateOnlineState = () => {
+  if (offlineBanner) offlineBanner.style.display = navigator.onLine ? 'none' : 'flex';
+};
+window.addEventListener('online',  updateOnlineState);
+window.addEventListener('offline', updateOnlineState);
+updateOnlineState();
+
+/* ── Modal ──────────────────────────────────────────────── */
+function openNewGestion() {
+  document.getElementById('gestionModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('gestionModal').classList.remove('open');
+}
+
+/* ── GPS ────────────────────────────────────────────────── */
+function toggleGPS() {
+  const type   = document.getElementById('gType').value;
+  const gpsDiv = document.getElementById('gpsStatus');
+  if (type === 'Visita') {
+    gpsDiv.style.display = 'block';
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('latitude').value   = pos.coords.latitude;
+      document.getElementById('longitude').value  = pos.coords.longitude;
+      document.getElementById('gpsDisplay').textContent = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+      document.getElementById('gpsDisplay').style.color = 'var(--ink-1)';
+    }, () => {
+      document.getElementById('gpsDisplay').textContent = 'No se pudo obtener GPS';
+      document.getElementById('gpsDisplay').style.color = 'var(--error-text)';
+    }, { enableHighAccuracy: true });
+  } else {
+    gpsDiv.style.display = 'none';
+    document.getElementById('latitude').value  = '';
+    document.getElementById('longitude').value = '';
+  }
+}
+
+/* ── Envío del formulario (online + offline) ────────────── */
+document.getElementById('gestionForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('gSubmit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Registrando...';
+
+  // 1. Comprimir evidencia si la hay
+  const evidenceInput = e.target.querySelector('input[name="evidence"]');
+  let   evidenceBlob  = null;
+  if (evidenceInput && evidenceInput.files.length > 0) {
+    try {
+      evidenceBlob = await imgUtils.compressSafe(evidenceInput.files[0]);
+    } catch (_) {
+      evidenceBlob = evidenceInput.files[0]; // fallback sin compresión
+    }
+  }
+
+  // 2. Construir FormData (sin el input file original)
+  const fd = new FormData(e.target);
+  fd.delete('evidence');
+  if (evidenceBlob) fd.append('evidence', evidenceBlob, 'evidence.jpg');
+
+  // 3. Offline → guardar en IndexedDB + Background Sync
+  if (!navigator.onLine) {
+    try {
+      await window.sigmaSync.saveOffline(fd, evidenceBlob);
+      if ('serviceWorker' in navigator) {
+        const sw = await navigator.serviceWorker.ready;
+        if ('sync' in sw) await sw.sync.register('sync-collections');
+      }
+      window.sigma.toast('Sin conexión — gestión guardada. Se enviará al recuperar la red.', 'default');
+      closeModal();
+      e.target.reset();
+    } catch (err) {
+      window.sigma.toast('No se pudo guardar offline: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Registrar';
+    }
+    return;
+  }
+
+  // 4. Online → enviar al servidor
+  try {
+    const r    = await fetch('/collections', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Gestión registrada correctamente', 'success');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      window.sigma.toast(data.message || 'Error al registrar', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Registrar';
+    }
+  } catch {
+    // Cayó la red justo al enviar — guardar offline
+    try {
+      await window.sigmaSync.saveOffline(fd, evidenceBlob);
+      window.sigma.toast('Sin conexión — gestión guardada localmente.', 'default');
+      closeModal();
+      e.target.reset();
+    } catch (_) {
+      window.sigma.toast('Error de conexión y fallo al guardar offline.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Registrar';
+    }
+  }
+});
+</script>
+<% } %>
+
+<!-- Modal nueva tarea vinculada al cliente (todos los roles con manage_tasks) -->
+<% if (user.roleId === 1 || user.roleId === 2 || user.roleId === 3) { %>
+<div class="modal-overlay" id="modalClientTask">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">Nueva tarea — <%= client.name %></span>
+      <button class="modal-close" onclick="document.getElementById('modalClientTask').classList.remove('open')">×</button>
+    </div>
+    <form id="formClientTask">
+      <input type="hidden" name="clientId" value="<%= client.id %>">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Título <span>*</span></label>
+          <input class="form-control" name="title" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-control" name="description" rows="2"></textarea>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Fecha límite <span>*</span></label>
+            <input class="form-control" type="datetime-local" name="dueDate" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prioridad</label>
+            <select class="form-control" name="priority">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+        </div>
+        <% if (user.roleId !== 3 && taskUsers.length > 0) { %>
+        <div class="form-group">
+          <label class="form-label">Asignar a</label>
+          <select class="form-control" name="userId">
+            <option value="">— yo mismo —</option>
+            <% taskUsers.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+          </select>
+        </div>
+        <% } %>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalClientTask').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnCreateClientTask">Crear tarea</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('formClientTask').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnCreateClientTask');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    const r    = await fetch('/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Tarea creada', 'success');
+      document.getElementById('modalClientTask').classList.remove('open');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      window.sigma.toast(data.message || 'Error al crear tarea', 'error');
+    }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear tarea'; }
+});
+</script>
+<% } %>
+
+<!-- Modal agregar contacto (admin y supervisor) -->
+<% if (user.roleId === 1 || user.roleId === 2) { %>
+<div class="modal-overlay" id="modalAddContact">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">Agregar contacto</span>
+      <button class="modal-close" onclick="document.getElementById('modalAddContact').classList.remove('open')">×</button>
+    </div>
+    <form id="formAddContact">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Teléfono <span>*</span></label>
+          <input class="form-control" name="phone" required placeholder="7000-0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre</label>
+          <input class="form-control" name="name" placeholder="Nombre del contacto">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Relación</label>
+          <input class="form-control" name="relationship" placeholder="Ej: Cónyuge, Referencia, Empleador…">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalAddContact').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveContact">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('formAddContact').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnSaveContact');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const body = Object.fromEntries(new FormData(e.target));
+    const r    = await fetch('/clients/<%= client.id %>/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Contacto agregado', 'success');
+      document.getElementById('modalAddContact').classList.remove('open');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      window.sigma.toast(data.message || 'Error', 'error');
+    }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+});
+
+async function deleteContact(contactId) {
+  const ok = await window.sigma?.confirm('¿Eliminar este contacto?', { confirmText: 'Eliminar' });
+  if (!ok) return;
+  try {
+    const r    = await fetch(`/clients/<%= client.id %>/contacts/${contactId}`, { method: 'DELETE' });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Contacto eliminado', 'success');
+      setTimeout(() => location.reload(), 600);
+    } else { window.sigma.toast(data.message || 'Error', 'error'); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+</script>
+<% } %>
+
+<% if (user.roleId === 1 || user.roleId === 2) { %>
+<script>
+async function escalateToLegal() {
+  const ok = await window.sigma?.confirm('¿Escalar este cliente a proceso de cobro legal? Se abrirá un expediente jurídico.', { confirmText: 'Escalar' });
+  if (!ok) return;
+  try {
+    const r    = await fetch('/legal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: <%= client.id %> }) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Proceso legal abierto', 'success');
+      setTimeout(() => location.href = `/legal/${data.data.id}`, 800);
+    } else { window.sigma.toast(data.message || 'Error', 'error'); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+</script>
+<% } %>

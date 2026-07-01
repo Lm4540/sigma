@@ -1,0 +1,163 @@
+<%
+const STATUS_CLASS = { activo:'badge-error', resuelto:'badge-success', archivado:'badge-neutral' };
+const STATUS_LABEL = { activo:'Activo', resuelto:'Resuelto', archivado:'Archivado' };
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-SV') : '—';
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/legal' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Filtros y acciones -->
+      <div class="flex items-center gap-3 mb-6" style="flex-wrap:wrap">
+        <form method="GET" action="/legal" class="flex items-center gap-2">
+          <select class="form-control" name="status" style="width:160px" onchange="this.form.submit()">
+            <option value="">Todos los estados</option>
+            <option value="activo"    <%= filters.status === 'activo'    ? 'selected' : '' %>>Activo</option>
+            <option value="resuelto"  <%= filters.status === 'resuelto'  ? 'selected' : '' %>>Resuelto</option>
+            <option value="archivado" <%= filters.status === 'archivado' ? 'selected' : '' %>>Archivado</option>
+          </select>
+        </form>
+        <span class="text-muted text-sm"><%= cases.length %> proceso<%= cases.length !== 1 ? 's' : '' %></span>
+        <div style="margin-left:auto">
+          <button class="btn btn-primary" onclick="document.getElementById('modalNewLegal').classList.add('open')">+ Nuevo proceso</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Código / Préstamo</th>
+                <th>Categoría</th>
+                <th style="text-align:right">Saldo</th>
+                <th>Responsable</th>
+                <th>Apertura</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (cases.length === 0) { %>
+              <tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">⚖️</div><div class="empty-state-title">Sin procesos legales</div><div class="empty-state-desc">Los clientes escalados a proceso legal aparecerán aquí.</div></div></td></tr>
+              <% } %>
+              <% cases.forEach(c => { %>
+              <tr>
+                <td>
+                  <a href="/legal/<%= c.id %>" style="font-weight:600;color:var(--navy);text-decoration:none"><%= c.client.name %></a>
+                  <% if (c.client.address) { %><div class="text-muted text-sm"><%= c.client.address %></div><% } %>
+                </td>
+                <td>
+                  <div class="mono text-sm"><%= c.client.clientCode || '' %></div>
+                  <div class="mono text-sm text-muted"><%= c.client.loanNumber || '' %></div>
+                </td>
+                <td><span class="risk-chip <%= c.client.riskCategory %>"><%= c.client.riskCategory %></span></td>
+                <td style="text-align:right" class="mono">$ <%= fmt(c.client.balance) %></td>
+                <td class="text-muted"><%= c.assignee ? c.assignee.name : '—' %></td>
+                <td class="text-muted text-sm"><%= fmtDate(c.openedAt) %></td>
+                <td><span class="badge <%= STATUS_CLASS[c.status] %>"><%= STATUS_LABEL[c.status] %></span></td>
+                <td><a href="/legal/<%= c.id %>" class="btn btn-ghost btn-sm">Ver expediente</a></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<!-- Modal nuevo proceso legal -->
+<div class="modal-overlay" id="modalNewLegal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo proceso legal</span>
+      <button class="modal-close" onclick="document.getElementById('modalNewLegal').classList.remove('open')">×</button>
+    </div>
+    <form id="formNewLegal">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Cliente <span>*</span></label>
+          <input class="form-control" id="legalClientSearch" placeholder="Buscar por nombre, código o préstamo…" autocomplete="off">
+          <input type="hidden" id="legalClientId" name="clientId" required>
+          <div id="legalClientResults" style="border:1px solid var(--border-1);border-radius:var(--r-sm);margin-top:4px;display:none;max-height:180px;overflow-y:auto;background:var(--surface-1)"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsable</label>
+          <select class="form-control" name="assignedTo">
+            <option value="">Sin asignar</option>
+            <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas iniciales</label>
+          <textarea class="form-control" name="notes" rows="3" placeholder="Motivo de escalada, acciones previas tomadas…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalNewLegal').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnCreateLegal">Abrir proceso</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Búsqueda de cliente para nuevo proceso
+let _searchTimer;
+document.getElementById('legalClientSearch').addEventListener('input', function() {
+  clearTimeout(_searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('legalClientResults').style.display = 'none'; return; }
+  _searchTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`/api/clients/search?q=${encodeURIComponent(q)}`);
+      const data = await r.json();
+      const box = document.getElementById('legalClientResults');
+      if (!data.data || !data.data.length) { box.style.display = 'none'; return; }
+      box.innerHTML = data.data.map(c =>
+        `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border-2);font-size:13px"
+              onmousedown="selectLegalClient(${c.id}, '${c.name.replace(/'/g, "\\'")}')">
+          <span style="font-weight:500">${c.name}</span>
+          <span class="text-muted" style="font-size:11px;margin-left:8px">${c.loanNumber || c.clientCode || ''}</span>
+        </div>`
+      ).join('');
+      box.style.display = 'block';
+    } catch {}
+  }, 300);
+});
+
+function selectLegalClient(id, name) {
+  document.getElementById('legalClientId').value = id;
+  document.getElementById('legalClientSearch').value = name;
+  document.getElementById('legalClientResults').style.display = 'none';
+}
+
+document.getElementById('formNewLegal').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!document.getElementById('legalClientId').value) {
+    window.sigma.toast('Selecciona un cliente', 'error'); return;
+  }
+  const btn = document.getElementById('btnCreateLegal');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const body = Object.fromEntries(new FormData(e.target));
+    const r    = await fetch('/legal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Proceso legal abierto', 'success');
+      setTimeout(() => location.href = `/legal/${data.data.id}`, 800);
+    } else {
+      window.sigma.toast(data.message || 'Error', 'error');
+    }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Abrir proceso'; }
+});
+</script>

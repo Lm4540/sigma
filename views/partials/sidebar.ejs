@@ -1,0 +1,146 @@
+<%
+const ROLES_MAP = { 1: 'Administrador', 2: 'Supervisor', 3: 'Gestor', 4: 'Secretaria' };
+const currentPath = locals.currentPath || '';
+const userRoleId = user ? user.roleId : 0;
+const PERMS = {
+  1: ['view_dashboard','view_clients','authorize_payment','import_data','manage_users','manage_branches','manage_assignments','view_audit_logs','view_reports','manage_tasks','export_reports','manage_legal'],
+  2: ['view_dashboard','view_clients','create_collection','authorize_payment','manage_assignments','view_reports','manage_tasks','export_reports','manage_legal'],
+  3: ['view_dashboard','view_clients','create_collection','manage_tasks'],
+  4: ['view_authorized_payments','update_payment_status'],
+};
+const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
+%>
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-mark">
+      <div class="brand-icon">S</div>
+      <div>
+        <div class="brand-name">SIGMA</div>
+        <div class="brand-sub">Cobranza Móvil</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-nav">
+    <% if (hasPerm('view_dashboard')) { %>
+    <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      Dashboard
+    </a>
+    <% } %>
+
+    <% if (hasPerm('view_clients')) { %>
+    <div class="nav-section">Cartera</div>
+    <a href="/clients" class="nav-link <%= currentPath.startsWith('/clients') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+      Clientes
+    </a>
+    <% } %>
+
+    <% if (hasPerm('manage_assignments')) { %>
+    <a href="/assignments" class="nav-link <%= currentPath.startsWith('/assignments') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
+      Asignaciones
+    </a>
+    <% } %>
+
+    <% if (hasPerm('authorize_payment') || hasPerm('update_payment_status')) { %>
+    <div class="nav-section">Pagos</div>
+    <% } %>
+
+    <% if (hasPerm('authorize_payment')) { %>
+    <a href="/collections/pending" class="nav-link <%= currentPath === '/collections/pending' ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+      Pagos Pendientes
+    </a>
+    <% } %>
+
+    <% if (hasPerm('update_payment_status')) { %>
+    <a href="/collections/pending" class="nav-link <%= currentPath === '/collections/pending' ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8l5 5 9-9"/></svg>
+      Pagos por Aplicar
+    </a>
+    <% } %>
+
+    <% if (hasPerm('manage_tasks')) { %>
+    <div class="nav-section">Seguimiento</div>
+    <a href="/tasks" class="nav-link <%= currentPath.startsWith('/tasks') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 8l2 2 4-4"/></svg>
+      Tareas
+    </a>
+    <% } %>
+
+    <% if (hasPerm('view_reports')) { %>
+    <div class="nav-section">Reportes</div>
+    <a href="/reports" class="nav-link <%= currentPath.startsWith('/reports') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12V8m4 4V5m4 7V3"/></svg>
+      Reportes
+    </a>
+    <% } %>
+
+    <% if (hasPerm('manage_legal')) { %>
+    <div class="nav-section">Jurídico</div>
+    <a href="/legal" class="nav-link <%= currentPath.startsWith('/legal') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 4v4c0 3.3 2.7 5.5 6 7 3.3-1.5 6-3.7 6-7V4L8 1z"/></svg>
+      Procesos Legales
+    </a>
+    <% } %>
+
+    <% if (hasPerm('manage_users') || hasPerm('manage_branches') || hasPerm('view_audit_logs')) { %>
+    <div class="nav-section">Administración</div>
+    <% } %>
+
+    <% if (hasPerm('manage_users')) { %>
+    <a href="/users" class="nav-link <%= currentPath.startsWith('/users') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 13c0-2.8 2.2-5 5-5"/><circle cx="12" cy="10" r="2.5"/><path d="M9.5 12.5h5"/><path d="M12 10v5"/></svg>
+      Usuarios
+    </a>
+    <% } %>
+
+    <% if (hasPerm('manage_branches')) { %>
+    <a href="/branches" class="nav-link <%= currentPath.startsWith('/branches') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l5 4v8H3V6z"/></svg>
+      Sucursales
+    </a>
+    <% } %>
+
+    <% if (hasPerm('view_audit_logs')) { %>
+    <a href="/audit" class="nav-link <%= currentPath.startsWith('/audit') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v10H2z"/><path d="M5 4V2h6v2"/><path d="M5 8h6M5 11h4"/></svg>
+      Auditoría
+    </a>
+    <% } %>
+  </div>
+
+  <div class="sidebar-footer">
+    <button class="btn-change-pw" onclick="document.getElementById('modalChangePw').classList.add('open')" title="Cambiar contraseña">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="12" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
+      Cambiar contraseña
+    </button>
+    <% if (locals.webAuthnEnabled === false) { %>
+    <button class="btn-change-pw" id="btnBiometricSidebar" hidden onclick="document.getElementById('modalBiometric').classList.add('open')" title="Habilitar biometría">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6.5C3 4 5.2 2 8 2s5 2 5 4.5"/><path d="M5.5 8c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 2-1 3.5-2.5 5"/><path d="M3 9.5C3 12 5 14 8 14"/><path d="M13 9.5C13 12 11 14 8 14"/></svg>
+      Habilitar biometría
+    </button>
+    <% } %>
+    <% if (locals.webAuthnEnabled === true) { %>
+    <button class="btn-change-pw" onclick="clearBiometrics()" title="Quitar acceso biométrico" style="color:var(--error-text,#c0392b)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6.5C3 4 5.2 2 8 2s5 2 5 4.5"/><path d="M5.5 8c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 2-1 3.5-2.5 5"/><path d="M3 9.5C3 12 5 14 8 14"/><path d="M13 9.5C13 12 11 14 8 14"/><line x1="2" y1="2" x2="14" y2="14" stroke-linecap="round"/></svg>
+      Quitar biometría
+    </button>
+    <% } %>
+    <div class="user-chip-row">
+      <div class="user-chip-info">
+        <div class="user-avatar"><%= user ? user.name?.charAt(0).toUpperCase() : '?' %></div>
+        <div class="user-info">
+          <div class="user-name"><%= user ? user.name : '' %></div>
+          <div class="user-role"><%= ROLES_MAP[userRoleId] || '' %></div>
+        </div>
+      </div>
+      <a href="/logout" class="btn-logout" title="Cerrar sesión">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><path d="M11 11l3-3-3-3"/><path d="M14 8H6"/></svg>
+        Salir
+      </a>
+    </div>
+  </div>
+</nav>

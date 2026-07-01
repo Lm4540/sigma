@@ -1,0 +1,133 @@
+<%
+const fmtDT = (d) => d ? new Date(d).toLocaleString('es-SV') : '—';
+const ACTION_CLASS = {
+  'user.login': 'badge-success', 'user.login_failed': 'badge-error', 'user.locked': 'badge-error',
+  'user.logout': 'badge-neutral', 'payment.authorized': 'badge-success', 'payment.rejected': 'badge-error',
+  'payment.applied': 'badge-info', 'import.executed': 'badge-info', 'access.denied': 'badge-error',
+  'collection.created': 'badge-success', 'assignment.created': 'badge-info', 'assignment.released': 'badge-warn',
+  'user.password_changed': 'badge-neutral', 'client.created': 'badge-info',
+  'legal.case_opened': 'badge-warn', 'legal.case_closed': 'badge-neutral', 'legal.document_uploaded': 'badge-info',
+};
+
+// Construye el texto de detalle legible a partir de newValue / action
+const buildDetail = (log) => {
+  const nv = log.newValue;
+  if (!nv) return null;
+  switch (log.action) {
+    case 'collection.created': {
+      const parts = [];
+      if (nv.clientName) parts.push(nv.clientName);
+      if (nv.loanNumber) parts.push(`#${nv.loanNumber}`);
+      if (nv.type) parts.push(`(${nv.type})`);
+      if (nv.hasPayment && nv.paymentAmount) parts.push(`💵 $${parseFloat(nv.paymentAmount).toFixed(2)}`);
+      return parts.join(' · ');
+    }
+    case 'import.executed':
+      return nv.created != null ? `${nv.created} creados · ${nv.updated} actualizados` : null;
+    case 'client.created':
+      return nv.name || null;
+    case 'assignment.created':
+    case 'assignment.released':
+      return nv.clientName ? `${nv.clientName}` : null;
+    case 'legal.case_opened':
+    case 'legal.case_closed':
+      return nv.clientName || null;
+    case 'legal.document_uploaded':
+      return nv.clientName ? `${nv.clientName} · ${nv.originalName || ''}` : nv.originalName || null;
+    case 'payment.authorized':
+    case 'payment.rejected':
+    case 'payment.applied':
+      return nv.clientName ? `${nv.clientName}${nv.paymentAmount ? ` · $${parseFloat(nv.paymentAmount).toFixed(2)}` : ''}` : null;
+    default:
+      return null;
+  }
+};
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/audit' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Filtros -->
+      <div class="card mb-6">
+        <form method="GET" action="/audit" class="flex gap-3 items-center" style="flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:140px">
+            <label class="form-label">Usuario</label>
+            <select class="form-control" name="userId">
+              <option value="">Todos</option>
+              <% users.forEach(u => { %>
+              <option value="<%= u.id %>" <%= filters.userId == u.id ? 'selected' : '' %>><%= u.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:160px">
+            <label class="form-label">Acción</label>
+            <select class="form-control" name="action">
+              <option value="">Todas</option>
+              <% ['user.login','user.login_failed','user.locked','user.logout','user.password_changed','payment.authorized','payment.rejected','payment.applied','assignment.created','assignment.released','import.executed','access.denied','collection.created','client.created','legal.case_opened','legal.case_closed','legal.document_uploaded'].forEach(a => { %>
+              <option value="<%= a %>" <%= filters.action === a ? 'selected' : '' %>><%= a %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group" style="min-width:130px">
+            <label class="form-label">Desde</label>
+            <input class="form-control" type="date" name="from" value="<%= filters.from || '' %>">
+          </div>
+          <div class="form-group" style="min-width:130px">
+            <label class="form-label">Hasta</label>
+            <input class="form-control" type="date" name="to" value="<%= filters.to || '' %>">
+          </div>
+          <div style="margin-top:18px">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="/audit" class="btn btn-ghost" style="margin-left:8px">Limpiar</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Detalle</th>
+                <th>Entidad</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (logs.length === 0) { %>
+              <tr><td colspan="6"><div class="empty-state"><div class="empty-state-title">Sin registros</div></div></td></tr>
+              <% } %>
+              <% logs.forEach(l => {
+                const detail = buildDetail(l);
+              %>
+              <tr>
+                <td class="mono text-sm"><%= fmtDT(l.createdAt) %></td>
+                <td><%= l.User ? l.User.name : '<em class="text-muted">sistema</em>' %></td>
+                <td><span class="badge <%= ACTION_CLASS[l.action] || 'badge-neutral' %>"><%= l.action %></span></td>
+                <td class="text-sm"><% if (detail) { %><span style="color:var(--ink-2)"><%= detail %></span><% } else { %><span class="text-muted">—</span><% } %></td>
+                <td class="text-muted text-sm"><%= l.entity || '' %><% if (l.entityId) { %> #<%= l.entityId %><% } %></td>
+                <td class="mono text-sm text-muted"><%= l.ipAddress || '—' %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (totalPages > 1) { %>
+        <div class="pagination" style="padding:16px 20px;border-top:1px solid var(--border-2)">
+          <% for (let p = 1; p <= totalPages; p++) { %>
+          <a href="/audit?page=<%= p %>" class="page-btn <%= p === page ? 'active' : '' %>"><%= p %></a>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>

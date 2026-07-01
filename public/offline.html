@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a2744">
+  <title>Sin conexión — SIGMA</title>
+  <style>
+    :root { --navy:#1a2744; --amber:#c97c1a; --canvas:#f0ede8; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: var(--canvas); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #fff; border: 1px solid rgba(26,39,68,0.10); border-radius: 14px; padding: 40px 32px; text-align: center; max-width: 360px; width: 100%; }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+    p { font-size: 14px; color: #7a8099; margin-bottom: 24px; line-height: 1.5; }
+    .btn { display: inline-block; padding: 10px 20px; background: var(--navy); color: #fff; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+    .pending { margin-top: 16px; font-size: 12px; color: var(--amber); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Sin conexión</h1>
+    <p>No hay conexión a internet. Puedes seguir registrando gestiones — se sincronizarán automáticamente al recuperar la red.</p>
+    <button class="btn" onclick="location.reload()">Reintentar conexión</button>
+    <div class="pending" id="pendingMsg"></div>
+  </div>
+  <script>
+    // Mostrar cantidad de gestiones pendientes en IndexedDB
+    const DB_NAME = 'sigma-offline';
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onsuccess = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('pending-collections')) return;
+      const tx  = db.transaction('pending-collections', 'readonly');
+      const cnt = tx.objectStore('pending-collections').count();
+      cnt.onsuccess = () => {
+        if (cnt.result > 0) {
+          document.getElementById('pendingMsg').textContent = `${cnt.result} gestión(es) en cola para sincronizar`;
+        }
+      };
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-SV') : '—';
+const fmtDT   = (d) => d ? new Date(d).toLocaleString('es-SV')     : '—';
+const STATUS_CLASS  = { activo:'badge-error', resuelto:'badge-success', archivado:'badge-neutral' };
+const STATUS_LABEL  = { activo:'Activo', resuelto:'Resuelto', archivado:'Archivado' };
+const DOC_TYPE_LABEL = { demanda:'Demanda', notificacion:'Notificación', resolucion:'Resolución', contrato:'Contrato', poder:'Poder notarial', resumen:'Resumen', otro:'Otro' };
+const DOC_ICON = { demanda:'⚖️', notificacion:'📬', resolucion:'📜', contrato:'📋', poder:'🔏', resumen:'📝', otro:'📄' };
+const TASK_STATUS_CLASS = { pendiente:'badge-warn', completada:'badge-success', vencida:'badge-error' };
+const PRIORITY_CLASS    = { alta:'badge-error', media:'badge-warn', baja:'badge-neutral' };
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/legal' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Cabecera del expediente -->
+      <div class="card mb-6">
+        <div class="flex items-center gap-4" style="flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div class="flex items-center gap-3 mb-2">
+              <span style="font-size:22px">⚖️</span>
+              <div>
+                <h1 style="font-size:17px;font-weight:700;color:var(--ink-1)"><%= legalCase.client.name %></h1>
+                <div class="flex gap-3 text-muted text-sm" style="margin-top:2px">
+                  <% if (legalCase.client.clientCode) { %><span>Código: <span class="mono"><%= legalCase.client.clientCode %></span></span><% } %>
+                  <% if (legalCase.client.loanNumber) { %><span>Préstamo: <span class="mono"><%= legalCase.client.loanNumber %></span></span><% } %>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-3 items-center" style="flex-wrap:wrap">
+              <span class="badge <%= STATUS_CLASS[legalCase.status] %>"><%= STATUS_LABEL[legalCase.status] %></span>
+              <span class="risk-chip <%= legalCase.client.riskCategory %>"><%= legalCase.client.riskCategory %></span>
+              <span class="text-muted text-sm">Apertura: <%= fmtDate(legalCase.openedAt) %></span>
+              <% if (legalCase.assignee) { %><span class="text-muted text-sm">Responsable: <strong><%= legalCase.assignee.name %></strong></span><% } %>
+              <span class="text-muted text-sm">Saldo: <span class="mono" style="color:var(--error-text);font-weight:600">$ <%= fmt(legalCase.client.balance) %></span></span>
+            </div>
+          </div>
+          <div class="flex gap-2" style="flex-shrink:0">
+            <a href="/clients/<%= legalCase.clientId %>" class="btn btn-ghost btn-sm">Ver ficha cliente</a>
+            <% if (legalCase.status === 'activo') { %>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalEditCase').classList.add('open')">Editar</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--risk-a1-text)" onclick="closeCase('resuelto')">Marcar resuelto</button>
+            <% } %>
+          </div>
+        </div>
+
+        <% if (legalCase.notes) { %>
+        <div id="caseNotes" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-2)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-3);margin-bottom:6px">Notas del caso</div>
+          <div style="white-space:pre-wrap;color:var(--ink-2);font-size:13px"><%= legalCase.notes %></div>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border-2);margin-bottom:24px" id="tabBar">
+        <button class="tab-btn active" onclick="switchTab('docs')"  id="tab-docs">📄 Documentos (<%= legalCase.documents.length %>)</button>
+        <button class="tab-btn"        onclick="switchTab('tasks')" id="tab-tasks">✅ Tareas (<%= tasks.length %>)</button>
+        <button class="tab-btn"        onclick="switchTab('contacts')" id="tab-contacts">👥 Contactos (<%= contacts.length %>)</button>
+      </div>
+
+      <!-- Tab: Documentos -->
+      <div id="pane-docs">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-muted text-sm"><%= legalCase.documents.length %> documento<%= legalCase.documents.length !== 1 ? 's' : '' %></span>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('modalUpload').classList.add('open')">+ Subir documento</button>
+        </div>
+
+        <% if (!legalCase.documents.length) { %>
+        <div class="card"><div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">Sin documentos</div><div class="empty-state-desc">Sube demandas, notificaciones, resoluciones y otros archivos del caso.</div></div></div>
+        <% } else { %>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+          <% legalCase.documents.forEach(doc => { %>
+          <div class="card" style="padding:16px">
+            <div class="flex items-start gap-3">
+              <span style="font-size:24px;flex-shrink:0"><%= DOC_ICON[doc.type] || '📄' %></span>
+              <div style="flex:1;overflow:hidden">
+                <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= doc.originalName %>"><%= doc.originalName %></div>
+                <div class="flex gap-2 items-center" style="margin-top:4px">
+                  <span class="badge badge-neutral" style="font-size:10px"><%= DOC_TYPE_LABEL[doc.type] || doc.type %></span>
+                  <span class="text-muted text-sm"><%= fmtDate(doc.createdAt) %></span>
+                </div>
+                <% if (doc.description) { %><div class="text-muted text-sm" style="margin-top:4px"><%= doc.description %></div><% } %>
+                <% if (doc.uploader) { %><div class="text-muted" style="font-size:11px;margin-top:4px">Por: <%= doc.uploader.name %></div><% } %>
+              </div>
+            </div>
+            <div class="flex gap-2" style="margin-top:12px">
+              <a href="<%= doc.url %>" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;text-align:center">Descargar</a>
+              <% if (user.roleId === 1) { %>
+              <button class="btn btn-ghost btn-sm" style="color:var(--error-text)" onclick="deleteDoc(<%= doc.id %>)">Eliminar</button>
+              <% } %>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Tab: Tareas -->
+      <div id="pane-tasks" style="display:none">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-muted text-sm"><%= tasks.length %> tarea<%= tasks.length !== 1 ? 's' : '' %></span>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('modalLegalTask').classList.add('open')">+ Nueva tarea</button>
+        </div>
+        <% if (!tasks.length) { %>
+        <div class="card"><div class="empty-state"><div class="empty-state-title">Sin tareas</div></div></div>
+        <% } else { %>
+        <div class="card" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Título</th><th>Responsable</th><th>Vencimiento</th><th>Prioridad</th><th>Estado</th></tr></thead>
+              <tbody>
+                <% tasks.forEach(t => { %>
+                <tr>
+                  <td style="font-weight:500"><%= t.title %><% if (t.description) { %><div class="text-muted text-sm"><%= t.description.substring(0,60) %></div><% } %></td>
+                  <td class="text-muted"><%= t.User ? t.User.name : '—' %></td>
+                  <td class="mono text-sm"><%= fmtDate(t.dueDate) %></td>
+                  <td><span class="badge <%= PRIORITY_CLASS[t.priority] %>"><%= t.priority %></span></td>
+                  <td><span class="badge <%= TASK_STATUS_CLASS[t.status] %>"><%= t.status %></span></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Tab: Contactos -->
+      <div id="pane-contacts" style="display:none">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-muted text-sm"><%= contacts.length %> contacto<%= contacts.length !== 1 ? 's' : '' %></span>
+        </div>
+        <% if (!contacts.length) { %>
+        <div class="card"><div class="empty-state"><div class="empty-state-title">Sin contactos registrados</div><div class="empty-state-desc">Los contactos se gestionan desde la ficha del cliente.</div></div></div>
+        <% } else { %>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+          <% contacts.forEach(ct => { %>
+          <div class="card" style="padding:16px">
+            <div style="font-weight:600;margin-bottom:4px"><%= ct.name || 'Sin nombre' %></div>
+            <% if (ct.relationship) { %><div class="text-muted text-sm"><%= ct.relationship %></div><% } %>
+            <div class="mono" style="margin-top:8px;font-size:14px"><%= ct.phone %></div>
+          </div>
+          <% }) %>
+        </div>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>
+
+<!-- Modal subir documento -->
+<div class="modal-overlay" id="modalUpload">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">Subir documento</span>
+      <button class="modal-close" onclick="document.getElementById('modalUpload').classList.remove('open')">×</button>
+    </div>
+    <form id="formUpload" enctype="multipart/form-data">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Archivo <span>*</span></label>
+          <input class="form-control" type="file" name="file" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx">
+          <div class="text-muted text-sm" style="margin-top:4px">PDF, Word, Excel, imágenes.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de documento</label>
+          <select class="form-control" name="type">
+            <option value="demanda">Demanda</option>
+            <option value="notificacion">Notificación</option>
+            <option value="resolucion">Resolución judicial</option>
+            <option value="contrato">Contrato</option>
+            <option value="poder">Poder notarial</option>
+            <option value="resumen">Resumen / notas</option>
+            <option value="otro" selected>Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <input class="form-control" name="description" placeholder="Descripción opcional…">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalUpload').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnUpload">Subir</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar caso -->
+<div class="modal-overlay" id="modalEditCase">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <span class="modal-title">Editar caso</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditCase').classList.remove('open')">×</button>
+    </div>
+    <form id="formEditCase">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-control" name="status">
+            <option value="activo"    <%= legalCase.status === 'activo'    ? 'selected' : '' %>>Activo</option>
+            <option value="resuelto"  <%= legalCase.status === 'resuelto'  ? 'selected' : '' %>>Resuelto</option>
+            <option value="archivado" <%= legalCase.status === 'archivado' ? 'selected' : '' %>>Archivado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsable</label>
+          <select class="form-control" name="assignedTo">
+            <option value="">Sin asignar</option>
+            <% taskUsers.forEach(u => { %><option value="<%= u.id %>" <%= legalCase.assignedTo == u.id ? 'selected' : '' %>><%= u.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <textarea class="form-control" name="notes" rows="4"><%= legalCase.notes || '' %></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalEditCase').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveCase">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal nueva tarea para el caso -->
+<div class="modal-overlay" id="modalLegalTask">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">Nueva tarea — <%= legalCase.client.name %></span>
+      <button class="modal-close" onclick="document.getElementById('modalLegalTask').classList.remove('open')">×</button>
+    </div>
+    <form id="formLegalTask">
+      <input type="hidden" name="clientId" value="<%= legalCase.clientId %>">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group"><label class="form-label">Título <span>*</span></label><input class="form-control" name="title" required></div>
+        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Fecha límite <span>*</span></label><input class="form-control" type="datetime-local" name="dueDate" required></div>
+          <div class="form-group">
+            <label class="form-label">Prioridad</label>
+            <select class="form-control" name="priority">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asignar a</label>
+          <select class="form-control" name="userId">
+            <option value="">— yo mismo —</option>
+            <% taskUsers.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalLegalTask').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnLegalTask">Crear tarea</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── Tabs ──────────────────────────────────────────────────────
+function switchTab(name) {
+  ['docs','tasks','contacts'].forEach(t => {
+    document.getElementById('pane-' + t).style.display = t === name ? 'block' : 'none';
+    document.getElementById('tab-'  + t).classList.toggle('active', t === name);
+  });
+}
+
+// ── Subir documento ───────────────────────────────────────────
+document.getElementById('formUpload').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnUpload');
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+  const fd = new FormData(e.target);
+  try {
+    const r    = await fetch('/legal/<%= legalCase.id %>/documents', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Documento subido', 'success');
+      document.getElementById('modalUpload').classList.remove('open');
+      setTimeout(() => location.reload(), 800);
+    } else { window.sigma.toast(data.message || 'Error', 'error'); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Subir'; }
+});
+
+// ── Eliminar documento ────────────────────────────────────────
+async function deleteDoc(id) {
+  const ok = await window.sigma?.confirm('¿Eliminar este documento? Esta acción no se puede deshacer.', { confirmText: 'Eliminar', danger: true });
+  if (!ok) return;
+  try {
+    const r = await fetch(`/legal/<%= legalCase.id %>/documents/${id}`, { method: 'DELETE' });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Documento eliminado' : 'Error', data.success ? 'success' : 'error');
+    if (data.success) location.reload();
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+
+// ── Editar caso ───────────────────────────────────────────────
+document.getElementById('formEditCase').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnSaveCase');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    const r    = await fetch('/legal/<%= legalCase.id %>', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Caso actualizado' : (data.message || 'Error'), data.success ? 'success' : 'error');
+    if (data.success) { document.getElementById('modalEditCase').classList.remove('open'); location.reload(); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+});
+
+// ── Cerrar caso ───────────────────────────────────────────────
+async function closeCase(status) {
+  const label = status === 'resuelto' ? 'resuelto' : 'archivado';
+  const ok = await window.sigma?.confirm(`¿Marcar este proceso como ${label}?`, { confirmText: 'Confirmar' });
+  if (!ok) return;
+  try {
+    const r    = await fetch('/legal/<%= legalCase.id %>', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    const data = await r.json();
+    window.sigma.toast(data.success ? 'Caso actualizado' : 'Error', data.success ? 'success' : 'error');
+    if (data.success) location.reload();
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+}
+
+// ── Nueva tarea ───────────────────────────────────────────────
+document.getElementById('formLegalTask').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnLegalTask');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    const r    = await fetch('/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.success) {
+      window.sigma.toast('Tarea creada', 'success');
+      document.getElementById('modalLegalTask').classList.remove('open');
+      setTimeout(() => { switchTab('tasks'); location.reload(); }, 800);
+    } else { window.sigma.toast(data.message || 'Error', 'error'); }
+  } catch { window.sigma.toast('Error de conexión', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear tarea'; }
+});
+</script>
+
+<style>
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--ink-1); }
+.tab-btn.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 600; }
+</style>
