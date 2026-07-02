@@ -13,3 +13,4 @@ CLAUDE.md
 .sequelizerc
 tunel ssh mysql.bat
 .interface-design
+credenciales-server.txt
