@@ -7,4 +7,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('Branch', {
   phone:     { type: DataTypes.STRING(20), allowNull: true },
   status:    { type: DataTypes.ENUM('on', 'off'), defaultValue: 'on' },
   createdBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'Branches', timestamps: true });
+}, { tableName: 'branches', timestamps: true });

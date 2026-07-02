@@ -6,4 +6,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SystemConfig', {
   value:     { type: DataTypes.TEXT, allowNull: false },
   label:     { type: DataTypes.STRING(255), allowNull: true },
   updatedBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'SystemConfig', timestamps: true });
+}, { tableName: 'systemconfig', timestamps: true });

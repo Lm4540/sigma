@@ -7,4 +7,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('ClientContact', {
   phone:        { type: DataTypes.STRING(20), allowNull: false },
   relationship: { type: DataTypes.STRING(100), allowNull: true },
   createdBy:    { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'ClientContacts', timestamps: true, updatedAt: false });
+}, { tableName: 'clientcontacts', timestamps: true, updatedAt: false });

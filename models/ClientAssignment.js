@@ -8,4 +8,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('ClientAssignment', 
   isActive:   { type: DataTypes.TINYINT(1), defaultValue: 1 },
   assignedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   releasedAt: { type: DataTypes.DATE, allowNull: true },
-}, { tableName: 'ClientAssignments', timestamps: false });
+}, { tableName: 'clientassignments', timestamps: false });

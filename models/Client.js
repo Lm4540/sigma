@@ -18,4 +18,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('Client', {
   riskCategory:    { type: DataTypes.STRING(5) },
   lastActivity:    { type: DataTypes.DATE, allowNull: true },
   createdBy:       { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'Clients', timestamps: true });
+}, { tableName: 'clients', timestamps: true });

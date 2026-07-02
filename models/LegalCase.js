@@ -9,4 +9,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('LegalCase', {
   closedAt:   { type: DataTypes.DATE, allowNull: true },
   notes:      { type: DataTypes.TEXT, allowNull: true },
   createdBy:  { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'LegalCases', timestamps: true });
+}, { tableName: 'legalcases', timestamps: true });

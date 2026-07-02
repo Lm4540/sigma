@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define('User', {
   webAuthnEnabled:   { type: DataTypes.TINYINT(1), defaultValue: 0 },
   createdBy:         { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
 }, {
-  tableName: 'Users',
+  tableName: 'users',
   timestamps: true,
   defaultScope: { attributes: { exclude: ['password'] } },
   scopes: { withPassword: { attributes: {} } },

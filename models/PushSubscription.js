@@ -10,4 +10,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('PushSubscription', 
       return raw && typeof raw === 'string' ? JSON.parse(raw) : raw;
     },
   },
-}, { tableName: 'PushSubscriptions', timestamps: true, updatedAt: false });
+}, { tableName: 'pushsubscriptions', timestamps: true, updatedAt: false });

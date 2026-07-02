@@ -6,4 +6,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('RevokedToken', {
   userId:    { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
   expiresAt: { type: DataTypes.DATE, allowNull: false },
   revokedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-}, { tableName: 'RevokedTokens', timestamps: false });
+}, { tableName: 'revokedtokens', timestamps: false });

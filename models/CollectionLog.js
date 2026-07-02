@@ -18,4 +18,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('CollectionLog', {
   appliedBy:          { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
   appliedAt:          { type: DataTypes.DATE, allowNull: true },
   createdBy:          { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'CollectionLogs', timestamps: true, updatedAt: false });
+}, { tableName: 'collectionlogs', timestamps: true, updatedAt: false });

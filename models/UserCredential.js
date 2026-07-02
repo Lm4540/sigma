@@ -7,4 +7,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('UserCredential', {
   publicKey:    { type: DataTypes.TEXT, allowNull: false },
   counter:      { type: DataTypes.BIGINT, allowNull: false },
   transports:   { type: DataTypes.STRING(255), allowNull: true },
-}, { tableName: 'UserCredentials', timestamps: false, updatedAt: false });
+}, { tableName: 'usercredentials', timestamps: false, updatedAt: false });

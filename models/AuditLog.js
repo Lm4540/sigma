@@ -16,4 +16,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('AuditLog', {
   },
   ipAddress:     { type: DataTypes.STRING(45), allowNull: true },
   userAgent:     { type: DataTypes.TEXT, allowNull: true },
-}, { tableName: 'AuditLogs', timestamps: true, updatedAt: false });
+}, { tableName: 'auditlogs', timestamps: true, updatedAt: false });

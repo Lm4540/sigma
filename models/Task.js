@@ -11,4 +11,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('Task', {
   status:      { type: DataTypes.ENUM('pendiente', 'completada', 'vencida'), defaultValue: 'pendiente' },
   isNotified:  { type: DataTypes.TINYINT(1), defaultValue: 0 },
   createdBy:   { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'Tasks', timestamps: true });
+}, { tableName: 'tasks', timestamps: true });

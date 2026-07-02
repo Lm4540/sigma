@@ -11,4 +11,4 @@ module.exports = (sequelize, DataTypes) => sequelize.define('LegalDocument', {
   description:  { type: DataTypes.TEXT, allowNull: true },
   uploadedBy:   { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
   createdBy:    { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-}, { tableName: 'LegalDocuments', timestamps: true, updatedAt: false });
+}, { tableName: 'legaldocuments', timestamps: true, updatedAt: false });
