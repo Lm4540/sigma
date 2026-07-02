@@ -7,7 +7,7 @@ module.exports = {
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT) || 3306,
-    dialect: 'mysql',
+    dialect: 'mysql2',
     timezone: '-06:00',
     dialectOptions: {
       charset: 'utf8mb4',
@@ -24,7 +24,7 @@ module.exports = {
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT) || 3306,
-    dialect: 'mysql',
+    dialect: 'mysql2',
     timezone: '-06:00',
     dialectOptions: {
       charset: 'utf8mb4',
