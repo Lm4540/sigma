@@ -25,8 +25,8 @@ const index = async (req, res, next) => {
           SELECT COUNT(*) AS total,
             SUM(CASE WHEN c.daysLate > 90 THEN 1 ELSE 0 END)  AS critical,
             COALESCE(SUM(c.balance + c.insurance + c.otherFees), 0) AS totalDeuda
-          FROM ClientAssignments ca
-          JOIN Clients c ON c.id = ca.clientId
+          FROM clientassignments ca
+          JOIN clients c ON c.id = ca.clientId
           WHERE ca.userId = ${parseInt(userId)} AND ca.isActive = 1
         `),
 
@@ -34,7 +34,7 @@ const index = async (req, res, next) => {
         sequelize.query(`
           SELECT COUNT(*) AS total,
             SUM(CASE WHEN dueDate <= NOW() THEN 1 ELSE 0 END) AS vencidas
-          FROM Tasks
+          FROM tasks
           WHERE userId = ${parseInt(userId)} AND status = 'pendiente'
         `),
 
@@ -43,8 +43,8 @@ const index = async (req, res, next) => {
           SELECT cl.type, cl.status, cl.paymentAmount,
                  DATE_FORMAT(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00'), '%d/%m/%Y %H:%i') AS fecha,
                  c.name AS clientName, c.riskCategory, c.id AS clientId
-          FROM CollectionLogs cl
-          JOIN Clients c ON cl.clientId = c.id
+          FROM collectionlogs cl
+          JOIN clients c ON cl.clientId = c.id
           WHERE cl.userId = ${parseInt(userId)}
           ORDER BY cl.createdAt DESC
           LIMIT 10
@@ -63,13 +63,13 @@ const index = async (req, res, next) => {
 
     // ── Admin / Supervisor ────────────────────────────────────────────────────
     const branchFilter = roleId === 1 ? '' : `AND c.branchId = ${parseInt(branchId)}`;
-    const branchJoin   = roleId !== 1 ? `JOIN Clients c ON cl.clientId = c.id WHERE c.branchId = ${parseInt(branchId)} AND` : 'WHERE';
+    const branchJoin   = roleId !== 1 ? `JOIN clients c ON cl.clientId = c.id WHERE c.branchId = ${parseInt(branchId)} AND` : 'WHERE';
 
     const [riskDist, todayStats, pendingPayments, topDebt] = await Promise.all([
       // Distribución NCB-022
       sequelize.query(`
         SELECT riskCategory, COUNT(*) AS total
-        FROM Clients c
+        FROM clients c
         WHERE 1=1 ${branchFilter}
         GROUP BY riskCategory ORDER BY riskCategory
       `),
@@ -80,7 +80,7 @@ const index = async (req, res, next) => {
           COUNT(*) AS total,
           SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN 1 ELSE 0 END) AS withPayment,
           COALESCE(SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN cl.paymentAmount ELSE 0 END), 0) AS totalAmount
-        FROM CollectionLogs cl
+        FROM collectionlogs cl
         ${branchJoin}
         DATE(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00')) = DATE(CONVERT_TZ(NOW(), '+00:00', '-06:00'))
       `),
@@ -88,7 +88,7 @@ const index = async (req, res, next) => {
       // Pagos pendientes de autorización
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl
+        FROM collectionlogs cl
         ${branchJoin}
         cl.paymentAmount IS NOT NULL AND cl.status = 'pendiente'
       `),
@@ -97,7 +97,7 @@ const index = async (req, res, next) => {
       sequelize.query(`
         SELECT c.name, c.riskCategory, c.daysLate, c.id,
                ROUND(c.balance + c.insurance + c.otherFees, 2) AS totalDeuda
-        FROM Clients c
+        FROM clients c
         WHERE 1=1 ${branchFilter}
         ORDER BY totalDeuda DESC LIMIT 5
       `),
