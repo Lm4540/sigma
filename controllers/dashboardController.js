@@ -15,7 +15,7 @@ const index = async (req, res, next) => {
             COUNT(*) AS total,
             SUM(CASE WHEN paymentAmount IS NOT NULL THEN 1 ELSE 0 END) AS withPayment,
             COALESCE(SUM(CASE WHEN paymentAmount IS NOT NULL THEN paymentAmount ELSE 0 END), 0) AS totalAmount
-          FROM CollectionLogs
+          FROM collectionlogs
           WHERE userId = ${parseInt(userId)}
             AND DATE(CONVERT_TZ(createdAt, '+00:00', '-06:00')) = DATE(CONVERT_TZ(NOW(), '+00:00', '-06:00'))
         `),

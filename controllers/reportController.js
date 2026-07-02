@@ -78,9 +78,9 @@ const index = async (req, res, next) => {
           SUM(CASE WHEN cl.type='Mensaje'  THEN 1 ELSE 0 END)                AS mensajes,
           SUM(CASE WHEN cl.status='autorizado' OR cl.status='aplicado'
                    THEN cl.paymentAmount ELSE 0 END)                          AS recuperado
-        FROM Users u
-        LEFT JOIN CollectionLogs cl ON cl.userId = u.id ${dateSql}
-        LEFT JOIN Clients c ON cl.clientId = c.id
+        FROM users u
+        LEFT JOIN collectionlogs cl ON cl.userId = u.id ${dateSql}
+        LEFT JOIN clients c ON cl.clientId = c.id
         WHERE u.roleId = 3 AND u.status = 'on'
           ${roleId === 3 ? `AND u.id = ${parseInt(userId)}` : ''}
           ${branchSql.replace(/c\.branchId/g, 'u.branchId')}
@@ -92,7 +92,7 @@ const index = async (req, res, next) => {
       sequelize.query(`
         SELECT riskCategory, COUNT(*) AS total,
                SUM(balance + insurance + otherFees) AS totalBalance
-        FROM Clients c
+        FROM clients c
         WHERE 1=1 ${branchSql}
         GROUP BY riskCategory ORDER BY riskCategory
       `),
@@ -101,8 +101,8 @@ const index = async (req, res, next) => {
       sequelize.query(`
         SELECT cl.status, COUNT(*) AS total,
                COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
         WHERE cl.paymentAmount IS NOT NULL ${dateSql} ${branchSql} ${gestorSql}
         GROUP BY cl.status
       `),
@@ -110,24 +110,24 @@ const index = async (req, res, next) => {
       // Pagos pendientes de autorización (con detalle para link)
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
         WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'pendiente' ${branchSql}
       `),
 
       // Pagos autorizados pendientes de aplicar (secretaria)
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
         WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'autorizado' ${branchSql}
       `),
 
       // Pagos ya aplicados en el ERP en el período
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
         WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'aplicado' ${branchSql} ${dateSql}
       `),
 
@@ -135,8 +135,8 @@ const index = async (req, res, next) => {
       sequelize.query(`
         SELECT DATE(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00')) AS fecha,
                COUNT(*) AS total
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
         WHERE cl.createdAt >= DATE_SUB(NOW(), INTERVAL 14 DAY) ${branchSql} ${gestorSql}
         GROUP BY fecha ORDER BY fecha ASC
       `),
@@ -147,9 +147,9 @@ const index = async (req, res, next) => {
                COALESCE(SUM(CASE WHEN cl.status IN ('autorizado','aplicado')
                                THEN cl.paymentAmount ELSE 0 END), 0) AS recuperado,
                COUNT(DISTINCT cl.id) AS gestiones
-        FROM Branches b
-        LEFT JOIN Clients c   ON c.branchId = b.id
-        LEFT JOIN CollectionLogs cl ON cl.clientId = c.id ${dateSql}
+        FROM branches b
+        LEFT JOIN clients c   ON c.branchId = b.id
+        LEFT JOIN collectionlogs cl ON cl.clientId = c.id ${dateSql}
         WHERE b.status = 'on'
         GROUP BY b.id, b.name
         ORDER BY recuperado DESC
@@ -159,7 +159,7 @@ const index = async (req, res, next) => {
       sequelize.query(`
         SELECT c.id, c.name, c.loanNumber, c.riskCategory, c.daysLate,
                (c.balance + c.insurance + c.otherFees) AS totalDeuda
-        FROM Clients c
+        FROM clients c
         WHERE 1=1 ${branchSql}
         ORDER BY totalDeuda DESC LIMIT 5
       `),
@@ -168,7 +168,7 @@ const index = async (req, res, next) => {
     // Sucursales para filtro (solo admin)
     let branches = [];
     if (roleId === 1) {
-      const [b] = await sequelize.query(`SELECT id, name FROM Branches WHERE status='on' ORDER BY name`);
+      const [b] = await sequelize.query(`SELECT id, name FROM branches WHERE status='on' ORDER BY name`);
       branches = b;
     }
 
@@ -224,9 +224,9 @@ const exportExcel = async (req, res, next) => {
           SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN 1 ELSE 0 END)    AS \`Pagos Reportados\`,
           ROUND(COALESCE(SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Monto Reportado USD\`,
           ROUND(COALESCE(SUM(CASE WHEN cl.status IN ('autorizado','aplicado') THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Monto Recuperado USD\`
-        FROM Users u
-        LEFT JOIN CollectionLogs cl ON cl.userId = u.id ${dateSql}
-        LEFT JOIN Clients c ON cl.clientId = c.id
+        FROM users u
+        LEFT JOIN collectionlogs cl ON cl.userId = u.id ${dateSql}
+        LEFT JOIN clients c ON cl.clientId = c.id
         WHERE u.roleId = 3 AND u.status = 'on'
           ${roleId === 3 ? `AND u.id = ${parseInt(userId)}` : ''}
           ${branchSql.replace(/c\.branchId/g, 'u.branchId')}
@@ -247,9 +247,9 @@ const exportExcel = async (req, res, next) => {
           cl.status                      AS Estado,
           ROUND(cl.paymentAmount, 2)     AS \`Monto USD\`,
           cl.comment                     AS Comentario
-        FROM CollectionLogs cl
-        JOIN Clients c ON cl.clientId = c.id
-        JOIN Users  u ON cl.userId    = u.id
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
+        JOIN users  u ON cl.userId    = u.id
         WHERE cl.paymentAmount IS NOT NULL ${dateSql} ${branchSql} ${gestorSql}
         ORDER BY cl.createdAt DESC
       `),
@@ -264,7 +264,7 @@ const exportExcel = async (req, res, next) => {
           ROUND(SUM(c.otherFees), 2)                             AS \`Otros Cargos USD\`,
           ROUND(SUM(c.balance + c.insurance + c.otherFees), 2)  AS \`Total Deuda USD\`,
           ROUND(AVG(c.daysLate), 0)                              AS \`Días Mora Promedio\`
-        FROM Clients c
+        FROM clients c
         WHERE 1=1 ${branchSql}
         GROUP BY c.riskCategory
         ORDER BY c.riskCategory

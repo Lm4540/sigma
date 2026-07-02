@@ -154,9 +154,9 @@ const pendingPayments = async (req, res, next) => {
       SELECT cl.id, cl.paymentAmount, cl.paymentType, cl.status, cl.createdAt,
              cl.evidenceUrl, c.name as clientName, c.loanNumber,
              u.name as gestorName
-      FROM CollectionLogs cl
-      JOIN Clients c ON cl.clientId = c.id
-      JOIN Users u ON cl.userId = u.id
+      FROM collectionlogs cl
+      JOIN clients c ON cl.clientId = c.id
+      JOIN users u ON cl.userId = u.id
       WHERE cl.paymentAmount IS NOT NULL
         AND cl.status = :targetStatus
         ${branchFilter}

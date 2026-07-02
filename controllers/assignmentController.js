@@ -11,9 +11,9 @@ const index = async (req, res, next) => {
     const [clients] = await sequelize.query(`
       SELECT c.id, c.name, c.clientCode, c.loanNumber, c.riskCategory, c.daysLate, c.address,
              u.name as gestorName, ca.assignedAt
-      FROM Clients c
-      LEFT JOIN ClientAssignments ca ON ca.clientId = c.id AND ca.isActive = 1
-      LEFT JOIN Users u ON ca.userId = u.id
+      FROM clients c
+      LEFT JOIN clientassignments ca ON ca.clientId = c.id AND ca.isActive = 1
+      LEFT JOIN users u ON ca.userId = u.id
       WHERE 1=1 ${branchFilter}
       ORDER BY c.daysLate DESC
     `, { replacements: { branchId } });

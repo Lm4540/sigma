@@ -29,27 +29,27 @@ const reportPdf = async (req, res, next) => {
     const [[riskDist], [paymentStatus], [byGestor], [topClients]] = await Promise.all([
       sequelize.query(`
         SELECT riskCategory, COUNT(*) AS total, SUM(balance + insurance + otherFees) AS totalBalance
-        FROM Clients c WHERE 1=1 ${branchSql} GROUP BY riskCategory ORDER BY riskCategory
+        FROM clients c WHERE 1=1 ${branchSql} GROUP BY riskCategory ORDER BY riskCategory
       `),
       sequelize.query(`
         SELECT cl.status, COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
-        FROM CollectionLogs cl JOIN Clients c ON cl.clientId = c.id
+        FROM collectionlogs cl JOIN clients c ON cl.clientId = c.id
         WHERE cl.paymentAmount IS NOT NULL ${dateSql} ${branchSql} GROUP BY cl.status
       `),
       sequelize.query(`
         SELECT u.name,
           COUNT(cl.id) AS totalGestiones,
           SUM(CASE WHEN cl.status IN ('autorizado','aplicado') THEN cl.paymentAmount ELSE 0 END) AS recuperado
-        FROM Users u
-        LEFT JOIN CollectionLogs cl ON cl.userId = u.id ${dateSql}
-        LEFT JOIN Clients c ON cl.clientId = c.id
+        FROM users u
+        LEFT JOIN collectionlogs cl ON cl.userId = u.id ${dateSql}
+        LEFT JOIN clients c ON cl.clientId = c.id
         WHERE u.roleId = 3 AND u.status = 'on' ${branchSql.replace(/c\.branchId/g, 'u.branchId')}
         GROUP BY u.id, u.name ORDER BY recuperado DESC
       `),
       sequelize.query(`
         SELECT c.name, c.riskCategory, c.daysLate,
                (c.balance + c.insurance + c.otherFees) AS totalDeuda
-        FROM Clients c WHERE 1=1 ${branchSql} ORDER BY totalDeuda DESC LIMIT 10
+        FROM clients c WHERE 1=1 ${branchSql} ORDER BY totalDeuda DESC LIMIT 10
       `),
     ]);
 
