@@ -75,7 +75,7 @@
                 <% credentials.forEach((c, idx) => { %>
                 <tr id="cred-row-<%= c.id %>">
                   <td>
-                    <div style="font-weight: 500;">Dispositivo #<%= idx + 1 %></div>
+                    <div style="font-weight: 500;"><%= c.deviceName || 'Dispositivo de confianza' %></div>
                     <div class="text-muted text-sm mono" style="font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= c.credentialId %></div>
                   </td>
                   <td>
@@ -145,8 +145,39 @@
       return btoa(String.fromCharCode(...u)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
+    function getDefaultDeviceName() {
+      const ua = navigator.userAgent;
+      let os = "Dispositivo";
+      if (ua.includes("Windows NT 10.0")) os = "Windows PC";
+      else if (ua.includes("Macintosh")) os = "Macbook/iMac";
+      else if (ua.includes("iPhone")) os = "iPhone";
+      else if (ua.includes("iPad")) os = "iPad";
+      else if (ua.includes("Android")) {
+        const match = ua.match(/Android\s+([^\;]+);\s+([^\;]+)\)/);
+        if (match && match[2]) {
+          os = match[2].trim();
+        } else {
+          os = "Celular Android";
+        }
+      } else if (ua.includes("Linux")) os = "Linux PC";
+
+      let browser = "";
+      if (ua.includes("Firefox")) browser = "Firefox";
+      else if (ua.includes("Chrome")) browser = "Chrome";
+      else if (ua.includes("Safari")) browser = "Safari";
+      else if (ua.includes("Edge")) browser = "Edge";
+
+      return browser ? `${os} (${browser})` : os;
+    }
+
     async function registerDevice() {
       const btn = document.getElementById('btnRegisterDevice');
+      
+      const defaultName = getDefaultDeviceName();
+      const customName = prompt("Ingresa un nombre para este dispositivo de confianza:", defaultName);
+      if (customName === null) return; // cancelado por el usuario
+      const finalName = customName.trim() || defaultName;
+
       btn.disabled = true; btn.textContent = 'Registrando...';
       try {
         // Obtener opciones del servidor
@@ -170,6 +201,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: cred.id, rawId: _waU8B64(new Uint8Array(cred.rawId)), type: cred.type,
+            deviceName: finalName,
             response: {
               clientDataJSON:    _waU8B64(new Uint8Array(cred.response.clientDataJSON)),
               attestationObject: _waU8B64(new Uint8Array(cred.response.attestationObject)),

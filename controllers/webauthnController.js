@@ -75,6 +75,7 @@ const registrationVerify = async (req, res, next) => {
       publicKey: Buffer.from(credential.publicKey).toString('base64'),
       counter: credential.counter,
       transports: (req.body.response?.transports || []).join(','),
+      deviceName: req.body.deviceName || 'Dispositivo de confianza',
     });
 
     await User.update({ webAuthnEnabled: 1 }, { where: { id: req.user.userId } });
