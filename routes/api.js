@@ -48,11 +48,11 @@ router.post('/push-subscription', async (req, res, next) => {
     const subscriptionJson = JSON.stringify({ endpoint, keys });
     // Reemplazar suscripción existente del mismo usuario en este dispositivo (por endpoint)
     await sequelize.query(
-      `DELETE FROM PushSubscriptions WHERE userId = :userId AND JSON_UNQUOTE(JSON_EXTRACT(subscription, '$.endpoint')) = :endpoint`,
+      `DELETE FROM pushsubscriptions WHERE userId = :userId AND JSON_UNQUOTE(JSON_EXTRACT(subscription, '$.endpoint')) = :endpoint`,
       { replacements: { userId, endpoint } }
     );
     await sequelize.query(
-      `INSERT INTO PushSubscriptions (userId, subscription, createdAt) VALUES (:userId, :subscription, NOW())`,
+      `INSERT INTO pushsubscriptions (userId, subscription, createdAt) VALUES (:userId, :subscription, NOW())`,
       { replacements: { userId, subscription: subscriptionJson } }
     );
     res.json({ success: true });
