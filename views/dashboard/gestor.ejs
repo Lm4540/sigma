@@ -13,38 +13,46 @@ const STATUS_CLASS = { pendiente: 'badge-warning', autorizado: 'badge-success', 
 
       <!-- KPIs del gestor -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Gestiones hoy</div>
-          <div class="stat-value"><%= todayStats.total || 0 %></div>
-          <div class="stat-sub"><%= todayStats.withPayment || 0 %> con pago reportado</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Recaudado hoy</div>
-          <div class="stat-value amber">$ <%- fmt(todayStats.totalAmount) %></div>
-          <div class="stat-sub">USD</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Clientes asignados</div>
-          <div class="stat-value navy"><%= assignedClients.total || 0 %></div>
-          <div class="stat-sub">
-            <% if ((assignedClients.critical || 0) > 0) { %>
-              <span style="color:var(--error)"><%= assignedClients.critical %> críticos (>90d)</span>
-            <% } else { %>
-              $ <%- fmt(assignedClients.totalDeuda) %> deuda total
-            <% } %>
+        <a href="/collections/list?from=<%= todayStr %>&to=<%= todayStr %>&userId=<%= user.id %>" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Gestiones hoy</div>
+            <div class="stat-value"><%= todayStats.total || 0 %></div>
+            <div class="stat-sub"><%= todayStats.withPayment || 0 %> con pago reportado</div>
           </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Tareas pendientes</div>
-          <div class="stat-value <%= (pendingTasks.vencidas || 0) > 0 ? 'amber' : '' %>"><%= pendingTasks.total || 0 %></div>
-          <div class="stat-sub">
-            <% if ((pendingTasks.vencidas || 0) > 0) { %>
-              <span style="color:var(--error)"><%= pendingTasks.vencidas %> vencida<%= pendingTasks.vencidas > 1 ? 's' : '' %></span>
-            <% } else { %>
-              al día
-            <% } %>
+        </a>
+        <a href="/collections/list?from=<%= todayStr %>&to=<%= todayStr %>&userId=<%= user.id %>&payment=true" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Recaudado hoy</div>
+            <div class="stat-value amber">$ <%- fmt(todayStats.totalAmount) %></div>
+            <div class="stat-sub">USD</div>
           </div>
-        </div>
+        </a>
+        <a href="/clients" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Clientes asignados</div>
+            <div class="stat-value navy"><%= assignedClients.total || 0 %></div>
+            <div class="stat-sub">
+              <% if ((assignedClients.critical || 0) > 0) { %>
+                <span style="color:var(--error)"><%= assignedClients.critical %> críticos (>90d)</span>
+              <% } else { %>
+                $ <%- fmt(assignedClients.totalDeuda) %> deuda total
+              <% } %>
+            </div>
+          </div>
+        </a>
+        <a href="/tasks" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Tareas pendientes</div>
+            <div class="stat-value <%= (pendingTasks.vencidas || 0) > 0 ? 'amber' : '' %>"><%= pendingTasks.total || 0 %></div>
+            <div class="stat-sub">
+              <% if ((pendingTasks.vencidas || 0) > 0) { %>
+                <span style="color:var(--error)"><%= pendingTasks.vencidas %> vencida<%= pendingTasks.vencidas > 1 ? 's' : '' %></span>
+              <% } else { %>
+                al día
+              <% } %>
+            </div>
+          </div>
+        </a>
       </div>
 
       <!-- Accesos rápidos -->

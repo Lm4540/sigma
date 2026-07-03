@@ -29,6 +29,20 @@ const authMiddleware = async (req, res, next) => {
 
     req.user = payload; // { userId, roleId, branchId, jti }
 
+    // Regenerar el token con cada petición (Rolling Session)
+    const newToken = jwt.sign(
+      { userId: payload.userId, roleId: payload.roleId, branchId: payload.branchId, jti: payload.jti },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    );
+
+    res.cookie('token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
     // Exponer webAuthnEnabled al frontend
     try {
       const u = await User.findByPk(payload.userId, { attributes: ['webAuthnEnabled'] });

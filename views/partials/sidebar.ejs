@@ -13,7 +13,7 @@ const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
 <nav class="sidebar">
   <div class="sidebar-brand">
     <div class="brand-mark">
-      <div class="brand-icon">S</div>
+      <img class="brand-icon" src="/icons/icon-96.png" alt="SIGMA Logo">
       <div>
         <div class="brand-name">SIGMA</div>
         <div class="brand-sub">Cobranza Móvil</div>
@@ -34,6 +34,10 @@ const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
     <a href="/clients" class="nav-link <%= currentPath.startsWith('/clients') ? 'active' : '' %>">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
       Clientes
+    </a>
+    <a href="/collections/list" class="nav-link <%= currentPath.startsWith('/collections/list') ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 6h6M5 10h6"/></svg>
+      Gestiones
     </a>
     <% } %>
 

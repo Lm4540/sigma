@@ -37,7 +37,7 @@ const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', recha
             <% if ((user.roleId === 1 || user.roleId === 2) && legalCase) { %>
             <a href="/legal/<%= legalCase.id %>" class="btn btn-ghost" style="color:var(--amber)">⚖️ Ver proceso legal</a>
             <% } %>
-            <% if (user.roleId === 3) { %>
+            <% if (user.roleId === 3 || user.roleId === 1) { %>
             <button class="btn btn-primary" onclick="openNewGestion()">Nueva gestión</button>
             <% } %>
           </div>
@@ -195,8 +195,8 @@ const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', recha
   <span>Sin conexión — las gestiones se guardarán localmente y se sincronizarán al recuperar la red</span>
 </div>
 
-<!-- Modal nueva gestión (solo gestor) -->
-<% if (user.roleId === 3) { %>
+<!-- Modal nueva gestión (solo gestor y admin) -->
+<% if (user.roleId === 3 || user.roleId === 1) { %>
 <div class="modal-overlay" id="gestionModal">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">

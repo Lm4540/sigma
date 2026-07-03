@@ -34,6 +34,7 @@ app.use((req, res, next) => {
   res.locals.IMG_MAX_PX       = parseInt(process.env.IMG_MAX_PX  || 1200);
   res.locals.IMG_QUALITY      = parseFloat(process.env.IMG_QUALITY || 0.8);
   res.locals.webAuthnEnabled  = false; // sobrescrito por authMiddleware cuando el usuario está autenticado
+  res.locals.BASE_URL         = process.env.BASE_URL || '/';
   next();
 });
 

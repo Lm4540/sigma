@@ -10,9 +10,11 @@ const create = async (req, res, next) => {
     const { userId, roleId } = req.user;
     const { clientId, type, comment, latitude, longitude, paymentAmount, paymentType } = req.body;
 
-    // Verificar asignación activa
-    const assignment = await ClientAssignment.findOne({ where: { clientId, userId, isActive: 1 } });
-    if (!assignment) return res.status(403).json({ success: false, message: 'No tienes asignado este cliente' });
+    // Verificar asignación activa (excepto administradores)
+    if (roleId !== 1) {
+      const assignment = await ClientAssignment.findOne({ where: { clientId, userId, isActive: 1 } });
+      if (!assignment) return res.status(403).json({ success: false, message: 'No tienes asignado este cliente' });
+    }
 
     let gpsAlertTriggered = 0;
 
@@ -169,4 +171,102 @@ const pendingPayments = async (req, res, next) => {
   }
 };
 
-module.exports = { create, authorizePayment, applyPayment, pendingPayments };
+const listCollections = async (req, res, next) => {
+  try {
+    const { roleId, branchId, userId } = req.user;
+    const { from, to, branchId: filterBranchId, userId: filterUserId, payment } = req.query;
+
+    const { sequelize, User, Branch } = require('../models');
+
+    // Construcción de condiciones WHERE para SQL crudo
+    let whereClause = '1=1';
+    const replacements = {};
+
+    // 1. Filtrado de seguridad según Rol
+    if (roleId === 3) {
+      // Gestor: solo ve sus propias gestiones
+      whereClause += ' AND cl.userId = :userId';
+      replacements.userId = userId;
+    } else if (roleId === 2) {
+      // Supervisor: solo ve gestiones de su sucursal
+      whereClause += ' AND c.branchId = :branchId';
+      replacements.branchId = branchId;
+
+      // Filtro opcional por gestor dentro de la misma sucursal
+      if (filterUserId) {
+        whereClause += ' AND cl.userId = :filterUserId';
+        replacements.filterUserId = parseInt(filterUserId);
+      }
+    } else {
+      // Admin: puede filtrar por cualquier sucursal y gestor
+      if (filterBranchId) {
+        whereClause += ' AND c.branchId = :filterBranchId';
+        replacements.filterBranchId = parseInt(filterBranchId);
+      }
+      if (filterUserId) {
+        whereClause += ' AND cl.userId = :filterUserId';
+        replacements.filterUserId = parseInt(filterUserId);
+      }
+    }
+
+    // 2. Filtros de Fecha (en hora local -06:00)
+    if (from) {
+      whereClause += " AND DATE(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00')) >= :from";
+      replacements.from = from;
+    }
+    if (to) {
+      whereClause += " AND DATE(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00')) <= :to";
+      replacements.to = to;
+    }
+
+    // 3. Filtro opcional de pagos
+    if (payment === 'true' || payment === true) {
+      whereClause += ' AND cl.paymentAmount IS NOT NULL';
+    }
+
+    // 4. Consulta de datos
+    const [rows] = await sequelize.query(`
+      SELECT cl.id, cl.type, cl.comment, cl.evidenceUrl, cl.latitude, cl.longitude,
+             cl.gpsAlertTriggered, cl.paymentAmount, cl.paymentType, cl.status,
+             cl.createdAt, DATE_FORMAT(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00'), '%d/%m/%Y %H:%i') AS fecha,
+             c.id AS clientId, c.name AS clientName, c.loanNumber,
+             u.name AS gestorName, b.name AS branchName
+      FROM collectionlogs cl
+      JOIN clients c ON cl.clientId = c.id
+      JOIN users u ON cl.userId = u.id
+      JOIN branches b ON c.branchId = b.id
+      WHERE ${whereClause}
+      ORDER BY cl.createdAt DESC
+    `, { replacements });
+
+    // 5. Cargar catálogos de filtros según rol
+    let branches = [];
+    let gestores = [];
+
+    if (roleId === 1) {
+      branches = await Branch.findAll({ order: [['name', 'ASC']] });
+      gestores = await User.findAll({ where: { roleId: 3 }, order: [['name', 'ASC']] });
+    } else if (roleId === 2) {
+      gestores = await User.findAll({ where: { roleId: 3, branchId }, order: [['name', 'ASC']] });
+    }
+
+    res.render('collections/list', {
+      title: 'Historial de Gestiones',
+      user: req.user,
+      collections: rows,
+      branches,
+      gestores,
+      filters: {
+        from: from || '',
+        to: to || '',
+        branchId: filterBranchId || '',
+        userId: filterUserId || '',
+        payment: payment === 'true' || payment === true ? 'true' : ''
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, authorizePayment, applyPayment, pendingPayments, listCollections };

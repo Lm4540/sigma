@@ -5,6 +5,7 @@ const { sequelize } = require('../models');
 const index = async (req, res, next) => {
   try {
     const { userId, roleId, branchId } = req.user;
+    const todayStr = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // ── Gestor: datos propios ─────────────────────────────────────────────────
     if (roleId === 3) {
@@ -54,6 +55,7 @@ const index = async (req, res, next) => {
       return res.render('dashboard/gestor', {
         title: 'Dashboard',
         user: req.user,
+        todayStr,
         todayStats:      todayStats[0][0]      || {},
         assignedClients: assignedClients[0][0] || {},
         pendingTasks:    pendingTasks[0][0]    || {},
@@ -106,6 +108,7 @@ const index = async (req, res, next) => {
     res.render('dashboard/index', {
       title: 'Dashboard',
       user: req.user,
+      todayStr,
       riskDist:        riskDist[0],
       todayStats:      todayStats[0][0]      || {},
       pendingPayments: pendingPayments[0][0] || {},

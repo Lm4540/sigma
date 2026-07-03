@@ -74,7 +74,11 @@ const PRIORITY_CLASS    = { alta:'badge-error', media:'badge-warn', baja:'badge-
         <div class="card"><div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">Sin documentos</div><div class="empty-state-desc">Sube demandas, notificaciones, resoluciones y otros archivos del caso.</div></div></div>
         <% } else { %>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
-          <% legalCase.documents.forEach(doc => { %>
+          <% legalCase.documents.forEach(doc => {
+            const viewableExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.txt'];
+            const docExt = doc.originalName ? doc.originalName.substring(doc.originalName.lastIndexOf('.')).toLowerCase() : '';
+            const isViewable = viewableExts.includes(docExt);
+          %>
           <div class="card" style="padding:16px">
             <div class="flex items-start gap-3">
               <span style="font-size:24px;flex-shrink:0"><%= DOC_ICON[doc.type] || '📄' %></span>
@@ -89,7 +93,10 @@ const PRIORITY_CLASS    = { alta:'badge-error', media:'badge-warn', baja:'badge-
               </div>
             </div>
             <div class="flex gap-2" style="margin-top:12px">
-              <a href="<%= doc.url %>" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;text-align:center">Descargar</a>
+              <% if (isViewable) { %>
+              <button class="btn btn-primary btn-sm" style="flex:1" onclick="viewDocument('<%= doc.url %>', '<%= doc.originalName %>')">Ver</button>
+              <% } %>
+              <a href="<%= doc.url %>" download="<%= doc.originalName %>" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;text-align:center">Descargar</a>
               <% if (user.roleId === 1) { %>
               <button class="btn btn-ghost btn-sm" style="color:var(--error-text)" onclick="deleteDoc(<%= doc.id %>)">Eliminar</button>
               <% } %>
@@ -353,7 +360,93 @@ document.getElementById('formLegalTask').addEventListener('submit', async (e) =>
   } catch { window.sigma.toast('Error de conexión', 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Crear tarea'; }
 });
+
+function viewDocument(url, filename) {
+  const modal = document.getElementById('docViewerModal');
+  const title = document.getElementById('docViewerTitle');
+  const body = document.getElementById('docViewerBody');
+  const downloadBtn = document.getElementById('docViewerDownload');
+
+  title.textContent = filename;
+  downloadBtn.href = url;
+  downloadBtn.setAttribute('download', filename);
+
+  const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+  body.innerHTML = ''; // Limpiar previo
+
+  if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '100%';
+    img.style.objectFit = 'contain';
+    img.style.borderRadius = 'var(--r-md)';
+    body.appendChild(img);
+  } else if (ext === '.pdf') {
+    const embed = document.createElement('embed');
+    embed.src = url;
+    embed.type = 'application/pdf';
+    embed.style.width = '100%';
+    embed.style.height = '100%';
+    embed.style.border = 'none';
+    body.appendChild(embed);
+  } else if (ext === '.txt') {
+    const pre = document.createElement('pre');
+    pre.style.width = '100%';
+    pre.style.height = '100%';
+    pre.style.margin = '0';
+    pre.style.padding = '12px';
+    pre.style.background = 'var(--surface)';
+    pre.style.border = '1px solid var(--border)';
+    pre.style.borderRadius = 'var(--r-md)';
+    pre.style.overflow = 'auto';
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.fontFamily = 'monospace';
+    pre.style.fontSize = '12px';
+    pre.textContent = 'Cargando contenido...';
+    body.appendChild(pre);
+
+    fetch(url)
+      .then(response => {
+        if (!response.ok) throw new Error('Error al cargar archivo');
+        return response.text();
+      })
+      .then(text => {
+        pre.textContent = text;
+      })
+      .catch(err => {
+        pre.textContent = 'Error: ' + err.message;
+        pre.style.color = 'var(--error-text)';
+      });
+  } else {
+    body.innerHTML = '<div class="text-muted">Formato no soportado para previsualización.</div>';
+  }
+
+  modal.classList.add('open');
+}
+
+function closeDocViewer() {
+  document.getElementById('docViewerModal').classList.remove('open');
+  document.getElementById('docViewerBody').innerHTML = '';
+}
 </script>
+
+<!-- Modal Visor de Documentos en Línea -->
+<div class="modal-overlay" id="docViewerModal">
+  <div class="modal" style="max-width: 90%; width: 800px; height: 80vh; display: flex; flex-direction: column;">
+    <div class="modal-header">
+      <span class="modal-title" id="docViewerTitle">Visor de Documento</span>
+      <button class="modal-close" onclick="closeDocViewer()">×</button>
+    </div>
+    <div class="modal-body" id="docViewerBody" style="flex: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background: var(--surface-3); padding: 16px; border-radius: var(--r-md);">
+      <!-- El contenido se cargará dinámicamente -->
+    </div>
+    <div class="modal-footer" style="justify-content: flex-end; gap: 8px;">
+      <a href="#" id="docViewerDownload" download="" class="btn btn-ghost">Descargar</a>
+      <button type="button" class="btn btn-primary" onclick="closeDocViewer()">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <style>
 .tab-btn {

@@ -8,93 +8,100 @@
 
       <!-- Ficha de Información del Usuario -->
       <div class="card mb-6">
-        <div class="flex items-center gap-4">
-          <div class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--amber); color: #fff; font-weight: 700;"><%= profileUser.name?.charAt(0).toUpperCase() %></div>
+        <div class="flex items-center gap-4" style="flex-wrap: wrap; justify-content: space-between; gap: var(--sp-4);">
+          <div class="flex items-center gap-4" style="flex-wrap: wrap;">
+            <div class="user-avatar" style="width: 48px; height: 48px; min-width: 48px; min-height: 48px; flex-shrink: 0; font-size: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--amber); color: #fff; font-weight: 700;"><%= profileUser.name?.charAt(0).toUpperCase() %></div>
+            <div>
+              <h1 style="font-size:18px;font-weight:700;color:var(--ink-1)"><%= profileUser.name %></h1>
+              <div class="flex gap-4 text-muted text-sm" style="margin-top:4px; flex-wrap: wrap;">
+                <span>Correo: <strong><%= profileUser.email %></strong></span>
+                <span>Rol: <strong><%= profileUser.role ? profileUser.role.name : '—' %></strong></span>
+                <% if (profileUser.branch) { %><span>Sucursal: <strong><%= profileUser.branch.name %></strong></span><% } %>
+              </div>
+            </div>
+          </div>
           <div>
-            <h1 style="font-size:18px;font-weight:700;color:var(--ink-1)"><%= profileUser.name %></h1>
-            <div class="flex gap-4 text-muted text-sm" style="margin-top:4px">
-              <span>Correo: <strong><%= profileUser.email %></strong></span>
-              <span>Rol: <strong><%= profileUser.role ? profileUser.role.name : '—' %></strong></span>
-              <% if (profileUser.branch) { %><span>Sucursal: <strong><%= profileUser.branch.name %></strong></span><% } %>
-            </div>
+            <button class="btn btn-ghost" onclick="document.getElementById('modalChangePw').classList.add('open')">🔑 Cambiar contraseña</button>
           </div>
         </div>
       </div>
 
-      <div class="grid-2">
-        <!-- Tarjeta: Cambiar Contraseña -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Cambiar contraseña</span>
-          </div>
-          <form id="profileFormChangePw" novalidate>
-            <div style="display:flex;flex-direction:column;gap:14px">
-              <div class="form-group">
-                <label class="form-label">Contraseña actual <span>*</span></label>
-                <input class="form-control" type="password" name="currentPassword" required autocomplete="current-password">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Nueva contraseña <span>*</span></label>
-                <input class="form-control" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Confirmar nueva contraseña <span>*</span></label>
-                <input class="form-control" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
-              </div>
-            </div>
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-              <button type="submit" class="btn btn-primary" id="profileBtnChangePw">Actualizar contraseña</button>
-            </div>
-          </form>
+      <!-- Tarjeta: Dispositivos de Confianza -->
+      <div class="card">
+        <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+          <span class="card-title">Dispositivos de confianza</span>
+          <button class="btn btn-primary btn-sm" id="btnRegisterDevice" onclick="registerDevice()">+ Registrar este dispositivo</button>
         </div>
-
-        <!-- Tarjeta: Dispositivos de Confianza -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Dispositivos de confianza</span>
-            <button class="btn btn-primary btn-sm" id="btnRegisterDevice" onclick="registerDevice()">+ Registrar este dispositivo</button>
-          </div>
-          
-          <% if (credentials.length === 0) { %>
-          <div class="empty-state" style="padding: 24px 0;">
-            <div class="empty-state-icon">🔑</div>
-            <div class="empty-state-title">Sin dispositivos registrados</div>
-            <div class="empty-state-desc">Registra la huella digital o reconocimiento facial de este dispositivo para iniciar sesión más rápido.</div>
-          </div>
-          <% } else { %>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Dispositivo</th>
-                  <th>Transportes</th>
-                  <th style="text-align:right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% credentials.forEach((c, idx) => { %>
-                <tr id="cred-row-<%= c.id %>">
-                  <td>
-                    <div style="font-weight: 500;"><%= c.deviceName || 'Dispositivo de confianza' %></div>
-                    <div class="text-muted text-sm mono" style="font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= c.credentialId %></div>
-                  </td>
-                  <td>
-                    <span class="badge badge-neutral">
-                      <%= c.transports ? c.transports.split(',').join(', ') : 'Lector del sistema' %>
-                    </span>
-                  </td>
-                  <td style="text-align:right">
-                    <button class="btn btn-danger btn-sm" onclick="deleteDevice(<%= c.id %>)">Eliminar</button>
-                  </td>
-                </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-          <% } %>
+        
+        <% if (credentials.length === 0) { %>
+        <div class="empty-state" style="padding: 24px 0;">
+          <div class="empty-state-icon">🔑</div>
+          <div class="empty-state-title">Sin dispositivos registrados</div>
+          <div class="empty-state-desc">Registra la huella digital o reconocimiento facial de este dispositivo para iniciar sesión más rápido.</div>
         </div>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Dispositivo</th>
+                <th>Transportes</th>
+                <th style="text-align:right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% credentials.forEach((c, idx) => { %>
+              <tr id="cred-row-<%= c.id %>">
+                <td>
+                  <div style="font-weight: 500;"><%= c.deviceName || 'Dispositivo de confianza' %></div>
+                  <div class="text-muted text-sm mono" style="font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= c.credentialId %></div>
+                </td>
+                <td>
+                  <span class="badge badge-neutral">
+                    <%= c.transports ? c.transports.split(',').join(', ') : 'Lector del sistema' %>
+                  </span>
+                </td>
+                <td style="text-align:right">
+                  <button class="btn btn-danger btn-sm" onclick="deleteDevice(<%= c.id %>)">Eliminar</button>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Modal Cambiar Contraseña -->
+  <div class="modal-overlay" id="modalChangePw">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <span class="modal-title">Cambiar contraseña</span>
+        <button class="modal-close" onclick="document.getElementById('modalChangePw').classList.remove('open')">×</button>
+      </div>
+      <form id="profileFormChangePw" novalidate>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Contraseña actual <span>*</span></label>
+            <input class="form-control" type="password" name="currentPassword" required autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nueva contraseña <span>*</span></label>
+            <input class="form-control" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmar nueva contraseña <span>*</span></label>
+            <input class="form-control" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalChangePw').classList.remove('open')">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="profileBtnChangePw">Actualizar contraseña</button>
+        </div>
+      </form>
     </div>
   </div>
 

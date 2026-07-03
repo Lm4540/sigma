@@ -21,26 +21,34 @@ const riskRows = [
     <div class="page-body">
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Gestiones hoy</div>
-          <div class="stat-value"><%= todayStats.total || 0 %></div>
-          <div class="stat-sub"><%= todayStats.withPayment || 0 %> con pago reportado</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Recaudado hoy</div>
-          <div class="stat-value amber">$ <%- fmt(todayStats.totalAmount) %></div>
-          <div class="stat-sub">USD</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pagos por autorizar</div>
-          <div class="stat-value <%= (pendingPayments.total || 0) > 0 ? 'amber' : '' %>"><%= pendingPayments.total || 0 %></div>
-          <div class="stat-sub">$ <%- fmt(pendingPayments.totalAmount) %> en espera</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total cartera</div>
-          <div class="stat-value navy"><%= totalCartera.toLocaleString('es-SV') %></div>
-          <div class="stat-sub">clientes en sistema</div>
-        </div>
+        <a href="/collections/list?from=<%= todayStr %>&to=<%= todayStr %>" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Gestiones hoy</div>
+            <div class="stat-value"><%= todayStats.total || 0 %></div>
+            <div class="stat-sub"><%= todayStats.withPayment || 0 %> con pago reportado</div>
+          </div>
+        </a>
+        <a href="/collections/list?from=<%= todayStr %>&to=<%= todayStr %>&payment=true" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Recaudado hoy</div>
+            <div class="stat-value amber">$ <%- fmt(todayStats.totalAmount) %></div>
+            <div class="stat-sub">USD</div>
+          </div>
+        </a>
+        <a href="/collections/pending" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Pagos por autorizar</div>
+            <div class="stat-value <%= (pendingPayments.total || 0) > 0 ? 'amber' : '' %>"><%= pendingPayments.total || 0 %></div>
+            <div class="stat-sub">$ <%- fmt(pendingPayments.totalAmount) %> en espera</div>
+          </div>
+        </a>
+        <a href="/clients" class="stat-card-link">
+          <div class="stat-card">
+            <div class="stat-label">Total cartera</div>
+            <div class="stat-value navy"><%= totalCartera.toLocaleString('es-SV') %></div>
+            <div class="stat-sub">clientes en sistema</div>
+          </div>
+        </a>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">

@@ -1,0 +1,137 @@
+<%
+const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+const TYPE_ICON = { Visita: '📍', Llamada: '📞', WhatsApp: '💬', Mensaje: '✉️' };
+const STATUS_CLASS = { pendiente: 'badge-warning', autorizado: 'badge-success', rechazado: 'badge-error', aplicado: 'badge-success' };
+%>
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/collections/list' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Filtros -->
+      <div class="card mb-6">
+        <form method="GET" action="/collections/list" class="flex gap-3 items-center" style="flex-wrap:wrap">
+          
+          <% if (user.roleId === 1) { %>
+          <div class="form-group" style="flex:1;min-width:140px">
+            <label class="form-label">Sucursal</label>
+            <select class="form-control" name="branchId">
+              <option value="">Todas</option>
+              <% branches.forEach(b => { %>
+              <option value="<%= b.id %>" <%= filters.branchId == b.id ? 'selected' : '' %>><%= b.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% } %>
+
+          <% if ([1, 2].includes(user.roleId)) { %>
+          <div class="form-group" style="flex:1;min-width:140px">
+            <label class="form-label">Gestor</label>
+            <select class="form-control" name="userId">
+              <option value="">Todos</option>
+              <% gestores.forEach(g => { %>
+              <option value="<%= g.id %>" <%= filters.userId == g.id ? 'selected' : '' %>><%= g.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% } %>
+
+          <div class="form-group" style="min-width:130px">
+            <label class="form-label">Desde</label>
+            <input class="form-control" type="date" name="from" value="<%= filters.from || '' %>">
+          </div>
+          <div class="form-group" style="min-width:130px">
+            <label class="form-label">Hasta</label>
+            <input class="form-control" type="date" name="to" value="<%= filters.to || '' %>">
+          </div>
+
+          <div class="form-group" style="min-width:130px">
+            <label class="form-label">Tipo de Gestión</label>
+            <select class="form-control" name="payment">
+              <option value="">Todas</option>
+              <option value="true" <%= filters.payment === 'true' ? 'selected' : '' %>>Solo con pago reportado</option>
+            </select>
+          </div>
+
+          <div style="margin-top:18px">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="/collections/list" class="btn btn-ghost" style="margin-left:8px">Limpiar</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tabla de Gestiones -->
+      <div class="card" style="padding:0">
+        <% if (collections.length === 0) { %>
+        <div class="empty-state" style="padding:40px">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-title">Sin gestiones encontradas</div>
+          <div class="empty-state-desc">Intenta ajustar los filtros de búsqueda.</div>
+        </div>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <% if (user.roleId === 1) { %><th>Sucursal</th><% } %>
+                <% if ([1, 2].includes(user.roleId)) { %><th>Gestor</th><% } %>
+                <th>Tipo</th>
+                <th>Comentario</th>
+                <th>Estado</th>
+                <th style="text-align:right">Monto</th>
+                <th>Detalles/Ubicación</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% collections.forEach(c => { %>
+              <tr>
+                <td class="text-muted" style="font-size:11px;white-space:nowrap"><%= c.fecha %></td>
+                <td>
+                  <a href="/clients/<%= c.clientId %>" style="color:inherit;text-decoration:none;font-weight:500"><%= c.clientName %></a>
+                  <div class="mono text-muted" style="font-size:10px"><%= c.loanNumber || '' %></div>
+                </td>
+                <% if (user.roleId === 1) { %>
+                <td><span class="badge badge-neutral"><%= c.branchName %></span></td>
+                <% } %>
+                <% if ([1, 2].includes(user.roleId)) { %>
+                <td class="text-muted"><%= c.gestorName %></td>
+                <% } %>
+                <td style="white-space:nowrap"><%= TYPE_ICON[c.type] || '' %> <%= c.type %></td>
+                <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= c.comment %>"><%= c.comment %></td>
+                <td><span class="badge <%= STATUS_CLASS[c.status] || '' %>"><%= c.status %></span></td>
+                <td style="text-align:right" class="mono">
+                  <% if (c.paymentAmount) { %>
+                    <span class="amber" style="font-weight:600">$ <%- fmt(c.paymentAmount) %></span>
+                    <div class="text-muted" style="font-size:9px"><%= c.paymentType %></div>
+                  <% } else { %>
+                    <span class="text-muted">—</span>
+                  <% } %>
+                </td>
+                <td>
+                  <div class="flex gap-2">
+                    <% if (c.evidenceUrl) { %>
+                      <a href="<%= c.evidenceUrl %>" target="_blank" class="btn btn-ghost btn-sm" title="Ver foto de evidencia">📷 Foto</a>
+                    <% } %>
+                    <% if (c.latitude && c.longitude) { %>
+                      <a href="https://www.google.com/maps/search/?api=1&query=<%= c.latitude %>,<%= c.longitude %>" target="_blank" class="btn btn-ghost btn-sm <%= c.gpsAlertTriggered ? 'btn-danger-text' : '' %>" title="<%= c.gpsAlertTriggered ? '¡Alerta de ubicación activada!' : 'Ver ubicación GPS' %>">
+                        📍 GPS <%= c.gpsAlertTriggered ? '⚠️' : '' %>
+                      </a>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+<%- include('../partials/foot') %>

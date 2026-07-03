@@ -4,7 +4,7 @@ const auditService = require('../services/auditService');
 
 // Mapa de permisos por roleId
 const ROLE_PERMISSIONS = {
-  1: ['view_dashboard','view_clients','authorize_payment','import_data','manage_users','manage_branches','manage_assignments','view_audit_logs','view_reports','manage_tasks','export_reports','manage_legal'],
+  1: ['view_dashboard','view_clients','create_collection','authorize_payment','import_data','manage_users','manage_branches','manage_assignments','view_audit_logs','view_reports','manage_tasks','export_reports','manage_legal'],
   2: ['view_dashboard','view_clients','create_collection','authorize_payment','manage_assignments','view_reports','manage_tasks','export_reports','manage_legal'],
   3: ['view_dashboard','view_clients','create_collection','manage_tasks'],
   4: ['view_authorized_payments','update_payment_status'],

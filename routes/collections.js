@@ -5,7 +5,7 @@ const multer = require('multer');
 const path   = require('path');
 const { v4: uuidv4 } = require('uuid');
 const checkPermission = require('../middlewares/checkPermission');
-const { create, authorizePayment, applyPayment, pendingPayments } = require('../controllers/collectionController');
+const { create, authorizePayment, applyPayment, pendingPayments, listCollections } = require('../controllers/collectionController');
 const { sensitive } = require('../middlewares/rateLimiter');
 const { checkAnyPermission } = require('../middlewares/checkPermission');
 const { createCollectionRules, paymentActionRules } = require('../middlewares/validate');
@@ -27,6 +27,7 @@ const upload = multer({
 });
 
 router.post('/',             sensitive, checkPermission('create_collection'), upload.single('evidence'), createCollectionRules, create);
+router.get('/list',          checkAnyPermission('view_clients', 'view_dashboard'), listCollections);
 router.get('/pending',       checkAnyPermission('authorize_payment', 'view_authorized_payments'), pendingPayments);
 router.patch('/:id/payment', checkPermission('authorize_payment'), paymentActionRules, authorizePayment);
 router.patch('/:id/apply',   checkPermission('update_payment_status'), applyPayment);
