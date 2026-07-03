@@ -12,9 +12,9 @@ const jwt = require('jsonwebtoken');
 const { User, UserCredential } = require('../models');
 const auditService = require('../services/auditService');
 
-const RP_NAME   = process.env.WEBAUTHN_RP_NAME   || 'SIGMA Cobranza';
-const RP_ID     = process.env.WEBAUTHN_RP_ID     || 'localhost';
-const ORIGIN    = process.env.WEBAUTHN_ORIGIN    || 'http://localhost:3000';
+const RP_NAME = process.env.WEBAUTHN_RP_NAME || 'SIGMA Cobranza';
+const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
+const ORIGIN = process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000';
 
 /* ── Registro ─────────────────────────────────────────── */
 const registrationOptions = async (req, res, next) => {
@@ -25,19 +25,20 @@ const registrationOptions = async (req, res, next) => {
     const existingCredentials = await UserCredential.findAll({ where: { userId: user.id } });
 
     const options = await generateRegistrationOptions({
-      rpName:               RP_NAME,
-      rpID:                 RP_ID,
-      userID:               Buffer.from(String(user.id)),
-      userName:             user.email,
-      userDisplayName:      user.name,
-      attestationType:      'none',
-      excludeCredentials:   existingCredentials.map(c => ({
-        id:         c.credentialId,   // v13+: base64url string, no Buffer
+      rpName: RP_NAME,
+      rpID: RP_ID,
+      userID: Buffer.from(String(user.id)),
+      userName: user.email,
+      userDisplayName: user.name,
+      attestationType: 'none',
+      excludeCredentials: existingCredentials.map(c => ({
+        id: c.credentialId,   // v13+: base64url string, no Buffer
         transports: c.transports ? c.transports.split(',') : [],
       })),
       authenticatorSelection: {
-        residentKey:      'preferred',
-        userVerification: 'preferred',
+        authenticatorAttachment: 'platform',
+        residentKey: 'preferred',
+        userVerification: 'required',
       },
     });
 
@@ -55,10 +56,10 @@ const registrationVerify = async (req, res, next) => {
     if (!challenge) return res.status(400).json({ success: false, message: 'Challenge expirado' });
 
     const verification = await verifyRegistrationResponse({
-      response:             req.body,
-      expectedChallenge:    challenge,
-      expectedOrigin:       ORIGIN,
-      expectedRPID:         RP_ID,
+      response: req.body,
+      expectedChallenge: challenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
       requireUserVerification: false,
     });
 
@@ -69,11 +70,11 @@ const registrationVerify = async (req, res, next) => {
     const { credential } = verification.registrationInfo;
 
     await UserCredential.create({
-      userId:       req.user.userId,
+      userId: req.user.userId,
       credentialId: Buffer.from(credential.id).toString('base64url'),
-      publicKey:    Buffer.from(credential.publicKey).toString('base64'),
-      counter:      credential.counter,
-      transports:   (req.body.response?.transports || []).join(','),
+      publicKey: Buffer.from(credential.publicKey).toString('base64'),
+      counter: credential.counter,
+      transports: (req.body.response?.transports || []).join(','),
     });
 
     await User.update({ webAuthnEnabled: 1 }, { where: { id: req.user.userId } });
@@ -102,7 +103,7 @@ const authOptions = async (req, res, next) => {
     const options = await generateAuthenticationOptions({
       rpID: RP_ID,
       allowCredentials: credentials.map(c => ({
-        id:         c.credentialId,   // v13+: base64url string, no Buffer
+        id: c.credentialId,   // v13+: base64url string, no Buffer
         transports: c.transports ? c.transports.split(',') : [],
       })),
       userVerification: 'preferred',
@@ -122,7 +123,7 @@ const authOptions = async (req, res, next) => {
 const authVerify = async (req, res, next) => {
   try {
     const challenge = req.cookies?.webauthn_challenge;
-    const uid       = parseInt(req.cookies?.webauthn_uid);
+    const uid = parseInt(req.cookies?.webauthn_uid);
     if (!challenge || !uid) return res.status(400).json({ success: false, message: 'Challenge expirado' });
 
     const credential = await UserCredential.findOne({ where: { credentialId: req.body.id } });
@@ -131,15 +132,15 @@ const authVerify = async (req, res, next) => {
     }
 
     const verification = await verifyAuthenticationResponse({
-      response:             req.body,
-      expectedChallenge:    challenge,
-      expectedOrigin:       ORIGIN,
-      expectedRPID:         RP_ID,
+      response: req.body,
+      expectedChallenge: challenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
       requireUserVerification: false,
       credential: {
-        id:         credential.credentialId,             // v13+: string
-        publicKey:  Buffer.from(credential.publicKey, 'base64'),
-        counter:    Number(credential.counter),
+        id: credential.credentialId,             // v13+: string
+        publicKey: Buffer.from(credential.publicKey, 'base64'),
+        counter: Number(credential.counter),
         transports: credential.transports ? credential.transports.split(',') : [],
       },
     });
@@ -155,7 +156,7 @@ const authVerify = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Cuenta inactiva o bloqueada' });
     }
 
-    const jti   = uuidv4();
+    const jti = uuidv4();
     const token = jwt.sign(
       { userId: user.id, roleId: user.roleId, branchId: user.branchId, jti },
       process.env.JWT_SECRET,
