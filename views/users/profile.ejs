@@ -170,16 +170,37 @@
       return browser ? `${os} (${browser})` : os;
     }
 
+    async function getDetailedDeviceName() {
+      let name = getDefaultDeviceName();
+      if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+        try {
+          const hints = await navigator.userAgentData.getHighEntropyValues(['model', 'platform', 'platformVersion']);
+          let model = hints.model;
+          let platform = hints.platform;
+          if (model) {
+            name = model;
+            if (platform) {
+              name += ` (${platform})`;
+            }
+          } else if (platform) {
+            name = platform;
+            if (hints.platformVersion) {
+              name += ` v${hints.platformVersion}`;
+            }
+          }
+        } catch (err) {
+          console.warn("Client Hints error:", err);
+        }
+      }
+      return name;
+    }
+
     async function registerDevice() {
       const btn = document.getElementById('btnRegisterDevice');
       
-      const defaultName = getDefaultDeviceName();
-      const customName = prompt("Ingresa un nombre para este dispositivo de confianza:", defaultName);
-      if (customName === null) return; // cancelado por el usuario
-      const finalName = customName.trim() || defaultName;
-
       btn.disabled = true; btn.textContent = 'Registrando...';
       try {
+        const finalName = await getDetailedDeviceName();
         // Obtener opciones del servidor
         const r1 = await fetch('/auth/webauthn/register-options', { method: 'POST' });
         const { success, options, message } = await r1.json();
