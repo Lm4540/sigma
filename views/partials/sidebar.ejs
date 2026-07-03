@@ -110,25 +110,15 @@ const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
       Auditoría
     </a>
     <% } %>
+
+    <div class="nav-section">Mi Cuenta</div>
+    <a href="/profile" class="nav-link <%= currentPath === '/profile' ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M3 14c0-2.5 2-4.5 5-4.5s5 2 5 4.5"/></svg>
+      Mi Perfil
+    </a>
   </div>
 
   <div class="sidebar-footer">
-    <button class="btn-change-pw" onclick="document.getElementById('modalChangePw').classList.add('open')" title="Cambiar contraseña">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="12" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
-      Cambiar contraseña
-    </button>
-    <% if (locals.webAuthnEnabled === false) { %>
-    <button class="btn-change-pw" id="btnBiometricSidebar" hidden onclick="document.getElementById('modalBiometric').classList.add('open')" title="Habilitar biometría">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6.5C3 4 5.2 2 8 2s5 2 5 4.5"/><path d="M5.5 8c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 2-1 3.5-2.5 5"/><path d="M3 9.5C3 12 5 14 8 14"/><path d="M13 9.5C13 12 11 14 8 14"/></svg>
-      Habilitar biometría
-    </button>
-    <% } %>
-    <% if (locals.webAuthnEnabled === true) { %>
-    <button class="btn-change-pw" onclick="clearBiometrics()" title="Quitar acceso biométrico" style="color:var(--error-text,#c0392b)">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6.5C3 4 5.2 2 8 2s5 2 5 4.5"/><path d="M5.5 8c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 2-1 3.5-2.5 5"/><path d="M3 9.5C3 12 5 14 8 14"/><path d="M13 9.5C13 12 11 14 8 14"/><line x1="2" y1="2" x2="14" y2="14" stroke-linecap="round"/></svg>
-      Quitar biometría
-    </button>
-    <% } %>
     <div class="user-chip-row">
       <div class="user-chip-info">
         <div class="user-avatar"><%= user ? user.name?.charAt(0).toUpperCase() : '?' %></div>
@@ -137,10 +127,6 @@ const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
           <div class="user-role"><%= ROLES_MAP[userRoleId] || '' %></div>
         </div>
       </div>
-      <a href="/logout" class="btn-logout" title="Cerrar sesión">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><path d="M11 11l3-3-3-3"/><path d="M14 8H6"/></svg>
-        Salir
-      </a>
     </div>
   </div>
 </nav>

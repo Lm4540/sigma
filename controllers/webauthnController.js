@@ -71,7 +71,7 @@ const registrationVerify = async (req, res, next) => {
 
     await UserCredential.create({
       userId: req.user.userId,
-      credentialId: Buffer.from(credential.id).toString('base64url'),
+      credentialId: credential.id,
       publicKey: Buffer.from(credential.publicKey).toString('base64'),
       counter: credential.counter,
       transports: (req.body.response?.transports || []).join(','),
@@ -104,9 +104,9 @@ const authOptions = async (req, res, next) => {
       rpID: RP_ID,
       allowCredentials: credentials.map(c => ({
         id: c.credentialId,   // v13+: base64url string, no Buffer
-        transports: c.transports ? c.transports.split(',') : [],
+        transports: c.transports ? c.transports.split(',').filter(Boolean) : [],
       })),
-      userVerification: 'preferred',
+      userVerification: 'required',
     });
 
     res.cookie('webauthn_challenge', options.challenge, {
@@ -178,7 +178,7 @@ const authVerify = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-/* ── Eliminar credenciales biométricas ────────────────── */
+/* ── Eliminar TODAS las credenciales biométricas ────────── */
 const deleteCredentials = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -188,4 +188,23 @@ const deleteCredentials = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { registrationOptions, registrationVerify, authOptions, authVerify, deleteCredentials };
+const deleteCredential = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const cred = await UserCredential.findOne({ where: { id, userId } });
+    if (!cred) return res.status(404).json({ success: false, message: 'Dispositivo no encontrado' });
+
+    await cred.destroy();
+
+    const count = await UserCredential.count({ where: { userId } });
+    if (count === 0) {
+      await User.update({ webAuthnEnabled: 0 }, { where: { id: userId } });
+    }
+
+    res.json({ success: true, message: 'Dispositivo de confianza eliminado' });
+  } catch (err) { next(err); }
+};
+
+module.exports = { registrationOptions, registrationVerify, authOptions, authVerify, deleteCredentials, deleteCredential };

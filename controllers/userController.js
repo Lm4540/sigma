@@ -1,7 +1,7 @@
 'use strict';
 
 const bcrypt = require('bcryptjs');
-const { User, Role, Branch, RevokedToken } = require('../models');
+const { User, Role, Branch, RevokedToken, UserCredential } = require('../models');
 const auditService = require('../services/auditService');
 
 const index = async (req, res, next) => {
@@ -92,4 +92,27 @@ const changePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { index, create, update, toggleStatus, unlock, changePassword };
+const showProfile = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.userId, {
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name'] },
+        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
+      ]
+    });
+    if (!user) return res.redirect('/login');
+
+    const credentials = await UserCredential.findAll({
+      where: { userId: user.id }
+    });
+
+    res.render('users/profile', {
+      title: 'Mi Perfil',
+      user: req.user,
+      profileUser: user,
+      credentials
+    });
+  } catch (err) { next(err); }
+};
+
+module.exports = { index, create, update, toggleStatus, unlock, changePassword, showProfile };

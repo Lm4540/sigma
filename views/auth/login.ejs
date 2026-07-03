@@ -149,7 +149,11 @@
     }
 
     function _b64ToUint8(b64) {
-      const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+      let activeB64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+      while (activeB64.length % 4) {
+        activeB64 += '=';
+      }
+      const bin = atob(activeB64);
       return Uint8Array.from([...bin].map(c => c.charCodeAt(0)));
     }
 

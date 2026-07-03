@@ -1,0 +1,219 @@
+<%- include('../partials/head') %>
+  <%- include('../partials/sidebar', { user, currentPath: '/profile' }) %>
+
+  <div class="main-content">
+    <%- include('../partials/topbar', { title }) %>
+
+    <div class="page-body">
+
+      <!-- Ficha de Información del Usuario -->
+      <div class="card mb-6">
+        <div class="flex items-center gap-4">
+          <div class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--amber); color: #fff; font-weight: 700;"><%= profileUser.name?.charAt(0).toUpperCase() %></div>
+          <div>
+            <h1 style="font-size:18px;font-weight:700;color:var(--ink-1)"><%= profileUser.name %></h1>
+            <div class="flex gap-4 text-muted text-sm" style="margin-top:4px">
+              <span>Correo: <strong><%= profileUser.email %></strong></span>
+              <span>Rol: <strong><%= profileUser.role ? profileUser.role.name : '—' %></strong></span>
+              <% if (profileUser.branch) { %><span>Sucursal: <strong><%= profileUser.branch.name %></strong></span><% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Tarjeta: Cambiar Contraseña -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Cambiar contraseña</span>
+          </div>
+          <form id="profileFormChangePw" novalidate>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div class="form-group">
+                <label class="form-label">Contraseña actual <span>*</span></label>
+                <input class="form-control" type="password" name="currentPassword" required autocomplete="current-password">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nueva contraseña <span>*</span></label>
+                <input class="form-control" type="password" name="newPassword" required minlength="8" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirmar nueva contraseña <span>*</span></label>
+                <input class="form-control" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+              </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-primary" id="profileBtnChangePw">Actualizar contraseña</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tarjeta: Dispositivos de Confianza -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Dispositivos de confianza</span>
+            <button class="btn btn-primary btn-sm" id="btnRegisterDevice" onclick="registerDevice()">+ Registrar este dispositivo</button>
+          </div>
+          
+          <% if (credentials.length === 0) { %>
+          <div class="empty-state" style="padding: 24px 0;">
+            <div class="empty-state-icon">🔑</div>
+            <div class="empty-state-title">Sin dispositivos registrados</div>
+            <div class="empty-state-desc">Registra la huella digital o reconocimiento facial de este dispositivo para iniciar sesión más rápido.</div>
+          </div>
+          <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dispositivo</th>
+                  <th>Transportes</th>
+                  <th style="text-align:right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% credentials.forEach((c, idx) => { %>
+                <tr id="cred-row-<%= c.id %>">
+                  <td>
+                    <div style="font-weight: 500;">Dispositivo #<%= idx + 1 %></div>
+                    <div class="text-muted text-sm mono" style="font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= c.credentialId %></div>
+                  </td>
+                  <td>
+                    <span class="badge badge-neutral">
+                      <%= c.transports ? c.transports.split(',').join(', ') : 'Lector del sistema' %>
+                    </span>
+                  </td>
+                  <td style="text-align:right">
+                    <button class="btn btn-danger btn-sm" onclick="deleteDevice(<%= c.id %>)">Eliminar</button>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <%- include('../partials/foot') %>
+
+  <script>
+    // 1. Lógica para cambiar contraseña
+    document.getElementById('profileFormChangePw')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd);
+      if (body.newPassword !== body.confirmPassword) {
+        window.sigma.toast('Las contraseñas no coinciden', 'error');
+        return;
+      }
+      const btn = document.getElementById('profileBtnChangePw');
+      btn.disabled = true; btn.textContent = 'Actualizando...';
+      try {
+        const r = await fetch('/users/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword: body.currentPassword, newPassword: body.newPassword })
+        });
+        const data = await r.json();
+        if (data.success) {
+          window.sigma.toast('Contraseña actualizada. Redirigiendo...', 'success');
+          setTimeout(() => { window.location.href = data.redirect || '/login'; }, 1500);
+        } else {
+          window.sigma.toast(data.message || 'Error al cambiar contraseña', 'error');
+          btn.disabled = false; btn.textContent = 'Actualizar contraseña';
+        }
+      } catch {
+        window.sigma.toast('Error de conexión', 'error');
+        btn.disabled = false; btn.textContent = 'Actualizar contraseña';
+      }
+    });
+
+    // 2. Lógica para WebAuthn (Base64 y Registro)
+    function _waB64(s) {
+      let activeB64 = s.replace(/-/g, '+').replace(/_/g, '/');
+      while (activeB64.length % 4) {
+        activeB64 += '=';
+      }
+      const b = atob(activeB64);
+      return Uint8Array.from([...b].map(c => c.charCodeAt(0)));
+    }
+    function _waU8B64(u) {
+      return btoa(String.fromCharCode(...u)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    async function registerDevice() {
+      const btn = document.getElementById('btnRegisterDevice');
+      btn.disabled = true; btn.textContent = 'Registrando...';
+      try {
+        // Obtener opciones del servidor
+        const r1 = await fetch('/auth/webauthn/register-options', { method: 'POST' });
+        const { success, options, message } = await r1.json();
+        if (!success) throw new Error(message || 'No se pudieron obtener opciones');
+
+        // Enrolar el dispositivo actual
+        const cred = await navigator.credentials.create({
+          publicKey: {
+            ...options,
+            challenge: _waB64(options.challenge),
+            user: { ...options.user, id: _waB64(options.user.id) },
+            excludeCredentials: (options.excludeCredentials || []).map(c => ({ ...c, id: _waB64(c.id) })),
+          }
+        });
+
+        // Enviar respuesta al servidor para verificar
+        const r2 = await fetch('/auth/webauthn/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cred.id, rawId: _waU8B64(new Uint8Array(cred.rawId)), type: cred.type,
+            response: {
+              clientDataJSON:    _waU8B64(new Uint8Array(cred.response.clientDataJSON)),
+              attestationObject: _waU8B64(new Uint8Array(cred.response.attestationObject)),
+            },
+          }),
+        });
+        const d2 = await r2.json();
+        if (d2.success) {
+          window.sigma.toast('Dispositivo registrado correctamente', 'success');
+          setTimeout(() => location.reload(), 1200);
+        } else {
+          window.sigma.toast(d2.message || 'Error al registrar', 'error');
+        }
+      } catch (e) {
+        if (e.name !== 'NotAllowedError') {
+          window.sigma.toast('Error al registrar dispositivo: ' + e.message, 'error');
+        }
+      } finally {
+        btn.disabled = false; btn.textContent = '+ Registrar este dispositivo';
+      }
+    }
+
+    // 3. Eliminar dispositivo
+    async function deleteDevice(id) {
+      const ok = await window.sigma?.confirm('¿Eliminar este dispositivo de confianza? Ya no podrás usarlo para iniciar sesión.', { confirmText: 'Eliminar', danger: true });
+      if (!ok) return;
+      try {
+        const r = await fetch(`/auth/webauthn/credentials/${id}`, { method: 'DELETE' });
+        const data = await r.json();
+        if (data.success) {
+          window.sigma.toast('Dispositivo de confianza eliminado', 'success');
+          document.getElementById(`cred-row-${id}`)?.remove();
+          setTimeout(() => location.reload(), 800);
+        } else {
+          window.sigma.toast(data.message || 'Error', 'error');
+        }
+      } catch {
+        window.sigma.toast('Error de conexión', 'error');
+      }
+    }
+
+    // Ocultar botón de registro si el navegador no soporta biometría
+    if (!window.PublicKeyCredential || !navigator.credentials) {
+      const btn = document.getElementById('btnRegisterDevice');
+      if (btn) btn.style.display = 'none';
+    }
+  </script>

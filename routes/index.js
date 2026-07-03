@@ -15,6 +15,7 @@ router.use('/tasks',      authMiddleware, require('./tasks'));
 router.use('/audit',      authMiddleware, require('./audit'));
 router.use('/reports',    authMiddleware, require('./reports'));
 router.use('/legal',      authMiddleware, require('./legal'));
+router.get('/profile',    authMiddleware, require('../controllers/userController').showProfile);
 router.use('/api',        authMiddleware, require('./api'));
 
 module.exports = router;
