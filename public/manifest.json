@@ -4,8 +4,8 @@
   "description": "Sistema de Gestión de Cobranza Móvil",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#1a2744",
-  "theme_color": "#1a2744",
+  "background_color": "#ffffff",
+  "theme_color": "#2e7d32",
   "orientation": "portrait-primary",
   "lang": "es",
   "icons": [
