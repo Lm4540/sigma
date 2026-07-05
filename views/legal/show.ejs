@@ -41,6 +41,7 @@ const PRIORITY_CLASS    = { alta:'badge-error', media:'badge-warn', baja:'badge-
           </div>
           <div class="flex gap-2" style="flex-shrink:0">
             <a href="/clients/<%= legalCase.clientId %>" class="btn btn-ghost btn-sm">Ver ficha cliente</a>
+            <a href="/legal/<%= legalCase.id %>/report" target="_blank" class="btn btn-ghost btn-sm" style="color:var(--amber)">📄 Reporte Resumen</a>
             <% if (legalCase.status === 'activo') { %>
             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalEditCase').classList.add('open')">Editar</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--risk-a1-text)" onclick="closeCase('resuelto')">Marcar resuelto</button>

@@ -56,12 +56,12 @@ const createCollectionRules = [
   body('paymentAmount').optional({ nullable: true, checkFalsy: true })
     .isDecimal({ decimal_digits: '0,2' }).withMessage('Monto de pago inválido'),
   body('paymentType').optional({ nullable: true, checkFalsy: true })
-    .isIn(['efectivo', 'especie', 'cheque', 'transferencia']).withMessage('Tipo de pago inválido'),
+    .isIn(['efectivo', 'nota_abono', 'especie', 'cheque', 'transferencia']).withMessage('Tipo de pago inválido'),
   handleValidation,
 ];
 
 const paymentActionRules = [
-  body('action').isIn(['autorizar', 'rechazar']).withMessage('Acción inválida'),
+  body('action').isIn(['autorizar', 'rechazar', 'solicitar_autorizacion']).withMessage('Acción inválida'),
   handleValidation,
 ];
 

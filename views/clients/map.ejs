@@ -1,0 +1,191 @@
+<%- include('../partials/head') %>
+<%- include('../partials/sidebar', { user, currentPath: '/clients' }) %>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+<style>
+  #map {
+    height: 500px;
+    width: 100%;
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(26, 39, 68, 0.10);
+    z-index: 1;
+  }
+  .map-card {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(26, 39, 68, 0.10);
+    padding: 20px;
+  }
+  .popup-visits-container {
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--ink-1);
+    min-width: 220px;
+  }
+  .popup-visit-item {
+    border-bottom: 1px solid var(--border-2);
+    padding: 6px 0;
+  }
+  .popup-visit-item:last-child {
+    border-bottom: none;
+  }
+  .popup-visit-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--navy);
+  }
+  .popup-visit-comment {
+    color: var(--ink-2);
+    font-style: italic;
+    margin-top: 3px;
+  }
+</style>
+
+<div class="main-content">
+  <%- include('../partials/topbar', { title }) %>
+
+  <div class="page-body">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <a href="/clients/<%= client.id %>" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px">
+          ← Volver a la ficha de <%= client.name %>
+        </a>
+      </div>
+      <div class="text-muted text-sm mono">
+        <%= pins.length %> ubicaciones agrupadas (500m de tolerancia)
+      </div>
+    </div>
+
+    <div class="map-card mb-6">
+      <div id="map"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-weight:600;font-size:14px;color:var(--navy);margin-bottom:12px">Historial de Visitas Geolocalizadas</h3>
+      <% if (pins.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-state-title">Sin historial de ubicaciones</div>
+          <div class="empty-state-desc">No se han registrado visitas con coordenadas GPS válidas para este cliente.</div>
+        </div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Coordenadas</th>
+                <th>Número de Visitas</th>
+                <th>Última Actividad en el Punto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pins.forEach((p, idx) => { %>
+                <tr>
+                  <td class="mono">
+                    <a href="#" onclick="focusPin(<%= idx %>, <%= p.latitude %>, <%= p.longitude %>); return false;" style="color:var(--amber);font-weight:600">
+                      <%= p.latitude.toFixed(6) %>, <%= p.longitude.toFixed(6) %>
+                    </a>
+                  </td>
+                  <td>
+                    <span class="badge badge-neutral"><%= p.visits.length %> visita<%= p.visits.length !== 1 ? 's' : '' %></span>
+                  </td>
+                  <td>
+                    <span class="text-muted">
+                      <%= new Date(p.visits[0].createdAt).toLocaleString('es-SV') %> por <%= p.visits[0].gestorName %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/foot') %>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  // Datos de los pines pasados desde el servidor
+  const pinsData = <%- JSON.stringify(pins) %>;
+  const clientLat = <%= lastKnownLat || 'null' %>;
+  const clientLng = <%= lastKnownLng || 'null' %>;
+
+  // Determinar punto de inicio del mapa
+  let mapCenter = [13.794185, -88.89653]; // El Salvador
+  let mapZoom = 8;
+
+  if (clientLat && clientLng) {
+    mapCenter = [clientLat, clientLng];
+    mapZoom = 14;
+  } else if (pinsData.length > 0) {
+    mapCenter = [pinsData[0].latitude, pinsData[0].longitude];
+    mapZoom = 13;
+  }
+
+  // Inicializar Leaflet
+  const map = L.map('map').setView(mapCenter, mapZoom);
+
+  // Añadir capa de OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  const markers = [];
+
+  // Dibujar pines en el mapa
+  pinsData.forEach((pin, idx) => {
+    // Construir contenido del popup
+    let popupHtml = '<div class="popup-visits-container">';
+    popupHtml += `<div style="font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--border);padding-bottom:4px">Ubicación #${idx + 1} (${pin.visits.length} visitas)</div>`;
+    
+    pin.visits.forEach(v => {
+      const dateStr = new Date(v.createdAt).toLocaleString('es-SV');
+      popupHtml += `
+        <div class="popup-visit-item">
+          <div class="popup-visit-header">
+            <span>${v.gestorName}</span>
+            <span class="mono">${dateStr}</span>
+          </div>
+          ${v.distance > 0 ? `<div style="font-size:9px;color:var(--amber);margin-top:1px">A ~${v.distance} metros del centro</div>` : ''}
+          <div class="popup-visit-comment">${v.comment}</div>
+        </div>
+      `;
+    });
+    
+    popupHtml += '</div>';
+
+    // Crear marcador
+    const marker = L.marker([pin.latitude, pin.longitude])
+      .addTo(map)
+      .bindPopup(popupHtml);
+      
+    markers.push(marker);
+  });
+
+  // Si se tiene la última ubicación del cliente, poner un marcador especial o enfocar
+  if (clientLat && clientLng) {
+    // Dibujar un círculo para indicar que es la última ubicación conocida
+    L.circle([clientLat, clientLng], {
+      color: 'var(--amber)',
+      fillColor: 'var(--amber)',
+      fillOpacity: 0.2,
+      radius: 100 // metros
+    }).addTo(map).bindPopup('<strong>Última ubicación conocida (Ficha)</strong>');
+  }
+
+  // Función para enfocar un pin desde la tabla
+  function focusPin(idx, lat, lng) {
+    map.setView([lat, lng], 15);
+    if (markers[idx]) {
+      markers[idx].openPopup();
+    }
+  }
+</script>

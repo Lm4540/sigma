@@ -52,6 +52,7 @@ ClientAssignment.belongsTo(User,   { foreignKey: 'assignedBy', as: 'assignedByUs
 
 CollectionLog.belongsTo(Client, { foreignKey: 'clientId' });
 CollectionLog.belongsTo(User,   { foreignKey: 'userId',       as: 'gestor' });
+CollectionLog.belongsTo(User,   { foreignKey: 'reviewedBy',   as: 'reviewer' });
 CollectionLog.belongsTo(User,   { foreignKey: 'authorizedBy', as: 'authorizer' });
 CollectionLog.belongsTo(User,   { foreignKey: 'appliedBy',    as: 'applier' });
 

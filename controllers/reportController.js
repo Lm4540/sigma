@@ -63,6 +63,9 @@ const index = async (req, res, next) => {
       daily,
       byBranch,
       topClients,
+      paymentsByGestor,
+      paymentsPendingApplyDetail,
+      pendingReview,
     ] = await Promise.all([
 
       // Desempeño por gestor con % de meta
@@ -76,7 +79,7 @@ const index = async (req, res, next) => {
           SUM(CASE WHEN cl.type='Llamada'  THEN 1 ELSE 0 END)                AS llamadas,
           SUM(CASE WHEN cl.type='WhatsApp' THEN 1 ELSE 0 END)                AS whatsapp,
           SUM(CASE WHEN cl.type='Mensaje'  THEN 1 ELSE 0 END)                AS mensajes,
-          SUM(CASE WHEN cl.status='autorizado' OR cl.status='aplicado'
+          SUM(CASE WHEN cl.status IN ('revisado', 'autorizado', 'aplicado')
                    THEN cl.paymentAmount ELSE 0 END)                          AS recuperado
         FROM users u
         LEFT JOIN collectionlogs cl ON cl.userId = u.id ${dateSql}
@@ -107,15 +110,15 @@ const index = async (req, res, next) => {
         GROUP BY cl.status
       `),
 
-      // Pagos pendientes de autorización (con detalle para link)
+      // Pagos pendientes de autorización (con detalle para link) - ESTADO: revisado
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
         FROM collectionlogs cl
         JOIN clients c ON cl.clientId = c.id
-        WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'pendiente' ${branchSql}
+        WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'revisado' ${branchSql}
       `),
 
-      // Pagos autorizados pendientes de aplicar (secretaria)
+      // Pagos autorizados pendientes de aplicar (secretaria) - ESTADO: autorizado
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
         FROM collectionlogs cl
@@ -123,7 +126,7 @@ const index = async (req, res, next) => {
         WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'autorizado' ${branchSql}
       `),
 
-      // Pagos ya aplicados en el ERP en el período
+      // Pagos ya aplicados en el ERP en el período - ESTADO: aplicado
       sequelize.query(`
         SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
         FROM collectionlogs cl
@@ -144,8 +147,8 @@ const index = async (req, res, next) => {
       // Recuperación por sucursal (solo admin)
       roleId === 1 ? sequelize.query(`
         SELECT b.name AS branchName,
-               COALESCE(SUM(CASE WHEN cl.status IN ('autorizado','aplicado')
-                               THEN cl.paymentAmount ELSE 0 END), 0) AS recuperado,
+               COALESCE(SUM(CASE WHEN cl.status IN ('revisado','autorizado','aplicado')
+                                THEN cl.paymentAmount ELSE 0 END), 0) AS recuperado,
                COUNT(DISTINCT cl.id) AS gestiones
         FROM branches b
         LEFT JOIN clients c   ON c.branchId = b.id
@@ -162,6 +165,53 @@ const index = async (req, res, next) => {
         FROM clients c
         WHERE 1=1 ${branchSql}
         ORDER BY totalDeuda DESC LIMIT 5
+      `),
+
+      // Reporte 1: Pagos recibidos por gestor
+      sequelize.query(`
+        SELECT u.id, u.name,
+          COUNT(cl.id)                                                         AS totalCount,
+          COALESCE(SUM(cl.paymentAmount), 0)                                   AS totalAmount,
+          SUM(CASE WHEN cl.status='pendiente' THEN 1 ELSE 0 END)              AS pendingCount,
+          COALESCE(SUM(CASE WHEN cl.status='pendiente' THEN cl.paymentAmount ELSE 0 END), 0) AS pendingAmount,
+          SUM(CASE WHEN cl.status='revisado' THEN 1 ELSE 0 END)               AS reviewedCount,
+          COALESCE(SUM(CASE WHEN cl.status='revisado' THEN cl.paymentAmount ELSE 0 END), 0) AS reviewedAmount,
+          SUM(CASE WHEN cl.status='autorizado' THEN 1 ELSE 0 END)             AS authorizedCount,
+          COALESCE(SUM(CASE WHEN cl.status='autorizado' THEN cl.paymentAmount ELSE 0 END), 0) AS authorizedAmount,
+          SUM(CASE WHEN cl.status='aplicado' THEN 1 ELSE 0 END)               AS appliedCount,
+          COALESCE(SUM(CASE WHEN cl.status='aplicado' THEN cl.paymentAmount ELSE 0 END), 0) AS appliedAmount,
+          SUM(CASE WHEN cl.status='rechazado' THEN 1 ELSE 0 END)              AS rejectedCount,
+          COALESCE(SUM(CASE WHEN cl.status='rechazado' THEN cl.paymentAmount ELSE 0 END), 0) AS rejectedAmount
+        FROM users u
+        LEFT JOIN collectionlogs cl ON cl.userId = u.id AND cl.paymentAmount IS NOT NULL ${dateSql}
+        LEFT JOIN clients c ON cl.clientId = c.id
+        WHERE u.roleId = 3 AND u.status = 'on'
+          ${roleId === 3 ? `AND u.id = ${parseInt(userId)}` : ''}
+          ${branchSql.replace(/c\.branchId/g, 'u.branchId')}
+        GROUP BY u.id, u.name
+        ORDER BY totalAmount DESC
+      `),
+
+      // Reporte 2: Detalle de pagos recibidos pendientes de aplicar
+      sequelize.query(`
+        SELECT cl.id, cl.paymentAmount, cl.paymentType, cl.status, cl.createdAt,
+               c.name AS clientName, c.loanNumber, u.name AS gestorName
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
+        JOIN users u ON cl.userId = u.id
+        WHERE cl.paymentAmount IS NOT NULL
+          AND cl.status IN ('pendiente', 'revisado', 'autorizado')
+          ${branchSql}
+          ${gestorSql}
+        ORDER BY cl.createdAt ASC
+      `),
+
+      // Pagos pendientes de revisión (Jefe de Operaciones) - ESTADO: pendiente
+      sequelize.query(`
+        SELECT COUNT(*) AS total, COALESCE(SUM(cl.paymentAmount), 0) AS totalAmount
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
+        WHERE cl.paymentAmount IS NOT NULL AND cl.status = 'pendiente' ${branchSql}
       `),
     ]);
 
@@ -184,6 +234,9 @@ const index = async (req, res, next) => {
       daily:       daily[0],
       byBranch:    byBranch[0],
       topClients:  topClients[0],
+      paymentsByGestor: paymentsByGestor[0],
+      paymentsPendingApplyDetail: paymentsPendingApplyDetail[0],
+      pendingReview: pendingReview[0][0]     || { total: 0, totalAmount: 0 },
       branches,
       filters: { from: dateFrom, to: dateTo, branch: branchFilter || '' },
       META_GESTIONES,
@@ -195,7 +248,7 @@ const index = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// Exporta un Excel con 3 hojas: gestiones, pagos, cartera
+// Exporta un Excel con 5 hojas: gestiones, pagos, cartera, pagos por gestor, pagos pendientes de aplicar
 const exportExcel = async (req, res, next) => {
   try {
     const { roleId, branchId, userId } = req.user;
@@ -211,7 +264,7 @@ const exportExcel = async (req, res, next) => {
     const dateTo   = isValidDate(to)   ? to   : new Date().toISOString().split('T')[0];
     const dateSql  = `AND DATE(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00')) BETWEEN '${dateFrom}' AND '${dateTo}'`;
 
-    const [[gestiones], [pagos], [cartera]] = await Promise.all([
+    const [[gestiones], [pagos], [cartera], [pagosPorGestor], [pagosPendientes]] = await Promise.all([
       // Hoja 1: gestiones por gestor
       sequelize.query(`
         SELECT
@@ -223,7 +276,7 @@ const exportExcel = async (req, res, next) => {
           SUM(CASE WHEN cl.type='Mensaje'  THEN 1 ELSE 0 END)              AS Mensajes,
           SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN 1 ELSE 0 END)    AS \`Pagos Reportados\`,
           ROUND(COALESCE(SUM(CASE WHEN cl.paymentAmount IS NOT NULL THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Monto Reportado USD\`,
-          ROUND(COALESCE(SUM(CASE WHEN cl.status IN ('autorizado','aplicado') THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Monto Recuperado USD\`
+          ROUND(COALESCE(SUM(CASE WHEN cl.status IN ('revisado','autorizado','aplicado') THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Monto Recuperado USD\`
         FROM users u
         LEFT JOIN collectionlogs cl ON cl.userId = u.id ${dateSql}
         LEFT JOIN clients c ON cl.clientId = c.id
@@ -269,6 +322,52 @@ const exportExcel = async (req, res, next) => {
         GROUP BY c.riskCategory
         ORDER BY c.riskCategory
       `),
+
+      // Hoja 4: pagos por gestor
+      sequelize.query(`
+        SELECT
+          u.name                                                             AS Gestor,
+          COUNT(cl.id)                                                       AS \`Total Pagos\`,
+          ROUND(COALESCE(SUM(cl.paymentAmount), 0), 2)                       AS \`Monto Total USD\`,
+          SUM(CASE WHEN cl.status='pendiente' THEN 1 ELSE 0 END)              AS \`Pendientes Cantidad\`,
+          ROUND(COALESCE(SUM(CASE WHEN cl.status='pendiente' THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Pendientes Monto USD\`,
+          SUM(CASE WHEN cl.status='revisado' THEN 1 ELSE 0 END)               AS \`Revisados Cantidad\`,
+          ROUND(COALESCE(SUM(CASE WHEN cl.status='revisado' THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Revisados Monto USD\`,
+          SUM(CASE WHEN cl.status='autorizado' THEN 1 ELSE 0 END)             AS \`Autorizados Cantidad\`,
+          ROUND(COALESCE(SUM(CASE WHEN cl.status='autorizado' THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Autorizados Monto USD\`,
+          SUM(CASE WHEN cl.status='aplicado' THEN 1 ELSE 0 END)               AS \`Aplicados Cantidad\`,
+          ROUND(COALESCE(SUM(CASE WHEN cl.status='aplicado' THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Aplicados Monto USD\`,
+          SUM(CASE WHEN cl.status='rechazado' THEN 1 ELSE 0 END)              AS \`Rechazados Cantidad\`,
+          ROUND(COALESCE(SUM(CASE WHEN cl.status='rechazado' THEN cl.paymentAmount ELSE 0 END), 0), 2) AS \`Rechazados Monto USD\`
+        FROM users u
+        LEFT JOIN collectionlogs cl ON cl.userId = u.id AND cl.paymentAmount IS NOT NULL ${dateSql}
+        LEFT JOIN clients c ON cl.clientId = c.id
+        WHERE u.roleId = 3 AND u.status = 'on'
+          ${roleId === 3 ? `AND u.id = ${parseInt(userId)}` : ''}
+          ${branchSql.replace(/c\.branchId/g, 'u.branchId')}
+        GROUP BY u.id, u.name
+        ORDER BY \`Monto Total USD\` DESC
+      `),
+
+      // Hoja 5: pagos pendientes de aplicar
+      sequelize.query(`
+        SELECT
+          DATE_FORMAT(CONVERT_TZ(cl.createdAt, '+00:00', '-06:00'), '%d/%m/%Y %H:%i') AS \`Fecha Recibido\`,
+          c.name                                                             AS Cliente,
+          c.loanNumber                                                       AS Préstamo,
+          u.name                                                             AS Gestor,
+          ROUND(cl.paymentAmount, 2)                                         AS \`Monto USD\`,
+          cl.paymentType                                                     AS \`Tipo Pago\`,
+          cl.status                                                          AS Estado
+        FROM collectionlogs cl
+        JOIN clients c ON cl.clientId = c.id
+        JOIN users u ON cl.userId = u.id
+        WHERE cl.paymentAmount IS NOT NULL
+          AND cl.status IN ('pendiente', 'revisado', 'autorizado')
+          ${branchSql}
+          ${gestorSql}
+        ORDER BY cl.createdAt ASC
+      `),
     ]);
 
     const wb = XLSX.utils.book_new();
@@ -281,6 +380,12 @@ const exportExcel = async (req, res, next) => {
 
     const wsCartera = XLSX.utils.json_to_sheet(cartera);
     XLSX.utils.book_append_sheet(wb, wsCartera, 'Cartera NCB-022');
+
+    const wsPagosGestor = XLSX.utils.json_to_sheet(pagosPorGestor);
+    XLSX.utils.book_append_sheet(wb, wsPagosGestor, 'Pagos por Gestor');
+
+    const wsPagosPendientes = XLSX.utils.json_to_sheet(pagosPendientes);
+    XLSX.utils.book_append_sheet(wb, wsPagosPendientes, 'Pagos Pendientes de Aplicar');
 
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const filename = `reporte-sigma-${dateFrom}-${dateTo}.xlsx`;

@@ -14,3 +14,5 @@ CLAUDE.md
 tunel ssh mysql.bat
 .interface-design
 credenciales-server.txt
+.gemini
+apagar.bat

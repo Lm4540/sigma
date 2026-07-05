@@ -1,7 +1,7 @@
 <%
 const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 const fmtDT = (d) => d ? new Date(d).toLocaleString('es-SV') : '—';
-const TYPE_LABEL = { efectivo:'Efectivo', especie:'Especie', cheque:'Cheque', transferencia:'Transferencia' };
+const TYPE_LABEL = { efectivo:'Efectivo', nota_abono:'Nota de Abono', especie:'Especie', cheque:'Cheque', transferencia:'Transferencia' };
 %>
 <%- include('../partials/head') %>
   <%- include('../partials/sidebar', { user, currentPath: '/collections/pending' }) %>
@@ -32,7 +32,7 @@ const TYPE_LABEL = { efectivo:'Efectivo', especie:'Especie', cheque:'Cheque', tr
                 <th style="text-align:right">Monto</th>
                 <th>Fecha</th>
                 <th>Evidencia</th>
-                <% if ([1,2].includes(user.roleId)) { %><th>Acciones</th><% } %>
+                <% if ([1,2,5].includes(user.roleId)) { %><th>Acciones</th><% } %>
                 <% if (user.roleId === 4) { %><th>Aplicar</th><% } %>
               </tr>
             </thead>
@@ -52,6 +52,14 @@ const TYPE_LABEL = { efectivo:'Efectivo', especie:'Especie', cheque:'Cheque', tr
                   <a href="<%= p.evidenceUrl %>" target="_blank" class="btn btn-ghost btn-sm">Ver foto</a>
                   <% } else { %><span class="text-muted">—</span><% } %>
                 </td>
+                <% if (user.roleId === 5) { %>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="paymentAction(<%= p.id %>, 'solicitar_autorizacion')">Solicitar Autorización</button>
+                    <button class="btn btn-danger btn-sm" onclick="paymentAction(<%= p.id %>, 'rechazar')">Rechazar</button>
+                  </div>
+                </td>
+                <% } %>
                 <% if ([1,2].includes(user.roleId)) { %>
                 <td>
                   <div class="flex gap-2">
@@ -80,9 +88,21 @@ const TYPE_LABEL = { efectivo:'Efectivo', especie:'Especie', cheque:'Cheque', tr
 <script>
 async function paymentAction(id, action) {
   const autorizar = action === 'autorizar';
+  const solicitar = action === 'solicitar_autorizacion';
+  let confirmMsg = '¿Rechazar este pago? Esta acción no se puede deshacer.';
+  let confirmBtn = 'Rechazar';
+  
+  if (autorizar) {
+    confirmMsg = '¿Confirmar autorización de este pago?';
+    confirmBtn = 'Autorizar';
+  } else if (solicitar) {
+    confirmMsg = '¿Solicitar autorización para la aplicación de este pago?';
+    confirmBtn = 'Solicitar';
+  }
+
   const ok = await window.sigma.confirm(
-    autorizar ? '¿Confirmar autorización de este pago?' : '¿Rechazar este pago? Esta acción no se puede deshacer.',
-    { confirmText: autorizar ? 'Autorizar' : 'Rechazar', danger: !autorizar }
+    confirmMsg,
+    { confirmText: confirmBtn, danger: !autorizar && !solicitar }
   );
   if (!ok) return;
   try {
@@ -93,7 +113,7 @@ async function paymentAction(id, action) {
     });
     const data = await r.json();
     if (data.success) {
-      window.sigma.toast(autorizar ? 'Pago autorizado' : 'Pago rechazado', 'success');
+      window.sigma.toast(solicitar ? 'Autorización solicitada' : (autorizar ? 'Pago autorizado' : 'Pago rechazado'), 'success');
       document.getElementById(`row-${id}`)?.remove();
       checkEmpty();
     } else {

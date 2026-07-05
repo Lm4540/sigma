@@ -8,6 +8,7 @@ const ROLE_PERMISSIONS = {
   2: ['view_dashboard','view_clients','create_collection','authorize_payment','manage_assignments','view_reports','manage_tasks','export_reports','manage_legal'],
   3: ['view_dashboard','view_clients','create_collection','manage_tasks'],
   4: ['view_authorized_payments','update_payment_status'],
+  5: ['view_dashboard','view_clients','review_payment','view_reports','export_reports','manage_tasks'],
 };
 
 // Determina si la respuesta debe ser JSON o HTML

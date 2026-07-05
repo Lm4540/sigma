@@ -4,7 +4,7 @@ const path   = require('path');
 const router = require('express').Router();
 const multer = require('multer');
 const checkPermission = require('../middlewares/checkPermission');
-const { index, show, importData, create, createContact, deleteContact } = require('../controllers/clientController');
+const { index, show, importData, create, createContact, deleteContact, showMap } = require('../controllers/clientController');
 const { createClientRules, createContactRules } = require('../middlewares/validate');
 const { sensitive } = require('../middlewares/rateLimiter');
 
@@ -21,6 +21,7 @@ const upload = multer({
 router.get('/',                         checkPermission('view_clients'), index);
 router.post('/',                        checkPermission('import_data'), createClientRules, create);
 router.get('/:id',                      checkPermission('view_clients'), show);
+router.get('/:id/map',                  checkPermission('view_clients'), showMap);
 router.post('/import',                  sensitive, checkPermission('import_data'), upload.single('file'), importData);
 router.post('/:id/contacts',            checkPermission('view_clients'), createContactRules, createContact);
 router.delete('/:id/contacts/:cid',     checkPermission('view_clients'), deleteContact);

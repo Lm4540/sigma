@@ -1,8 +1,8 @@
 <%
 const fmt = (n) => n != null ? parseFloat(n).toLocaleString('es-SV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 const pct = (v, total) => total > 0 ? Math.min(100, Math.round((v / total) * 100)) : 0;
-const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', rechazado:'badge-error', aplicado:'badge-info' };
-const STATUS_LABEL = { pendiente:'Pendiente', autorizado:'Autorizado', rechazado:'Rechazado', aplicado:'Aplicado' };
+const STATUS_CLASS = { pendiente:'badge-warn', revisado:'badge-warn', autorizado:'badge-success', rechazado:'badge-error', aplicado:'badge-info' };
+const STATUS_LABEL = { pendiente:'Pendiente', revisado:'Revisado', autorizado:'Autorizado', rechazado:'Rechazado', aplicado:'Aplicado' };
 const riskCats = ['A1','A2','B','C','D','E'];
 const totalCartera = riskDist.reduce((s, r) => s + parseInt(r.total), 0);
 const totalBalance = riskDist.reduce((s, r) => s + parseFloat(r.totalBalance || 0), 0);
@@ -204,6 +204,81 @@ const dailyMax = daily.length ? Math.max(...daily.map(d => parseInt(d.total)), 1
             <% }) %>
           </div>
           <% } %>
+        </div>
+      </div>
+
+      <!-- Reporte: Pagos Recibidos por Gestor -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">Pagos recibidos por gestor</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gestor</th>
+                <th style="text-align:right">Cant. Pagos</th>
+                <th style="text-align:right">Monto Total</th>
+                <th style="text-align:right">Pendiente</th>
+                <th style="text-align:right">Revisado</th>
+                <th style="text-align:right">Autorizado</th>
+                <th style="text-align:right">Aplicado</th>
+                <th style="text-align:right">Rechazado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (paymentsByGestor.length === 0) { %>
+                <tr><td colspan="8"><div class="empty-state text-muted">No se registran pagos en este período.</div></td></tr>
+              <% } %>
+              <% paymentsByGestor.forEach(g => { %>
+                <tr>
+                  <td><strong><%= g.name %></strong></td>
+                  <td style="text-align:right" class="mono"><%= g.totalCount %></td>
+                  <td style="text-align:right" class="mono" style="font-weight:600;color:var(--navy)">$ <%= fmt(g.totalAmount) %></td>
+                  <td style="text-align:right" class="mono text-muted">$ <%= fmt(g.pendingAmount) %></td>
+                  <td style="text-align:right" class="mono text-muted">$ <%= fmt(g.reviewedAmount) %></td>
+                  <td style="text-align:right" class="mono text-muted">$ <%= fmt(g.authorizedAmount) %></td>
+                  <td style="text-align:right" class="mono text-muted" style="color:var(--risk-a1-text)">$ <%= fmt(g.appliedAmount) %></td>
+                  <td style="text-align:right" class="mono text-muted" style="color:var(--error-text)">$ <%= fmt(g.rejectedAmount) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reporte: Pagos Pendientes de Aplicar -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">Pagos recibidos pendientes de aplicar</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Gestor</th>
+                <th>Tipo Pago</th>
+                <th>Estado</th>
+                <th style="text-align:right">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (paymentsPendingApplyDetail.length === 0) { %>
+                <tr><td colspan="6"><div class="empty-state text-muted">Todos los pagos recibidos han sido aplicados.</div></td></tr>
+              <% } %>
+              <% paymentsPendingApplyDetail.forEach(p => { %>
+                <tr>
+                  <td class="text-muted"><%= new Date(p.createdAt).toLocaleDateString('es-SV') %></td>
+                  <td>
+                    <a href="/clients/<%= p.id %>" style="font-weight:500;color:var(--navy);text-decoration:none"><%= p.clientName %></a>
+                    <div class="mono text-muted text-sm"><%= p.loanNumber || '' %></div>
+                  </td>
+                  <td class="text-muted"><%= p.gestorName %></td>
+                  <td><span class="badge badge-neutral"><%= ({efectivo:'Efectivo',nota_abono:'Nota de Abono',especie:'Especie',cheque:'Cheque',transferencia:'Transferencia'})[p.paymentType] || p.paymentType %></span></td>
+                  <td><span class="badge <%= STATUS_CLASS[p.status] %>"><%= STATUS_LABEL[p.status] || p.status %></span></td>
+                  <td style="text-align:right" class="mono"><span style="font-weight:600;color:var(--amber)">$ <%= fmt(p.paymentAmount) %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
         </div>
       </div>
 

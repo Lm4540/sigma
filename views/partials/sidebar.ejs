@@ -1,5 +1,5 @@
 <%
-const ROLES_MAP = { 1: 'Administrador', 2: 'Supervisor', 3: 'Gestor', 4: 'Secretaria' };
+const ROLES_MAP = { 1: 'Administrador', 2: 'Supervisor', 3: 'Gestor', 4: 'Secretaria', 5: 'Jefe de Operaciones' };
 const currentPath = locals.currentPath || '';
 const userRoleId = user ? user.roleId : 0;
 const PERMS = {
@@ -7,6 +7,7 @@ const PERMS = {
   2: ['view_dashboard','view_clients','create_collection','authorize_payment','manage_assignments','view_reports','manage_tasks','export_reports','manage_legal'],
   3: ['view_dashboard','view_clients','create_collection','manage_tasks'],
   4: ['view_authorized_payments','update_payment_status'],
+  5: ['view_dashboard','view_clients','review_payment','view_reports','export_reports','manage_tasks'],
 };
 const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
 %>
@@ -48,8 +49,15 @@ const hasPerm = (p) => (PERMS[userRoleId] || []).includes(p);
     </a>
     <% } %>
 
-    <% if (hasPerm('authorize_payment') || hasPerm('update_payment_status')) { %>
+    <% if (hasPerm('review_payment') || hasPerm('authorize_payment') || hasPerm('update_payment_status')) { %>
     <div class="nav-section">Pagos</div>
+    <% } %>
+
+    <% if (hasPerm('review_payment')) { %>
+    <a href="/collections/pending" class="nav-link <%= currentPath === '/collections/pending' ? 'active' : '' %>">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v12M8 4v8M4 6v4"/></svg>
+      Revisión de Pagos
+    </a>
     <% } %>
 
     <% if (hasPerm('authorize_payment')) { %>

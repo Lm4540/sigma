@@ -28,8 +28,8 @@ const upload = multer({
 
 router.post('/',             sensitive, checkPermission('create_collection'), upload.single('evidence'), createCollectionRules, create);
 router.get('/list',          checkAnyPermission('view_clients', 'view_dashboard'), listCollections);
-router.get('/pending',       checkAnyPermission('authorize_payment', 'view_authorized_payments'), pendingPayments);
-router.patch('/:id/payment', checkPermission('authorize_payment'), paymentActionRules, authorizePayment);
+router.get('/pending',       checkAnyPermission('authorize_payment', 'view_authorized_payments', 'review_payment'), pendingPayments);
+router.patch('/:id/payment', checkAnyPermission('authorize_payment', 'review_payment'), paymentActionRules, authorizePayment);
 router.patch('/:id/apply',   checkPermission('update_payment_status'), applyPayment);
 
 module.exports = router;

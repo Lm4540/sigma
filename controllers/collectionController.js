@@ -63,8 +63,13 @@ const create = async (req, res, next) => {
       createdBy: userId,
     });
 
-    // Actualizar lastActivity del cliente
-    await Client.update({ lastActivity: new Date() }, { where: { id: clientId } });
+    // Actualizar lastActivity y última ubicación del cliente si es Visita
+    const clientUpdateData = { lastActivity: new Date() };
+    if (type === 'Visita' && latitude && longitude) {
+      clientUpdateData.lastKnownLat = latitude;
+      clientUpdateData.lastKnownLng = longitude;
+    }
+    await Client.update(clientUpdateData, { where: { id: clientId } });
 
     const clientRecord = await Client.findByPk(clientId, { attributes: ['name', 'loanNumber'] });
     auditService.log({
@@ -114,14 +119,29 @@ const create = async (req, res, next) => {
 
 const authorizePayment = async (req, res, next) => {
   try {
-    const { action } = req.body; // 'autorizar' | 'rechazar'
-    const log = await paymentService.authorize({
-      logId: parseInt(req.params.id),
-      action,
-      authorizedById: req.user.userId,
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
+    const { action } = req.body; // 'autorizar' | 'rechazar' | 'solicitar_autorizacion'
+    const logId = parseInt(req.params.id);
+    const userId = req.user.userId;
+    const roleId = req.user.roleId;
+
+    let log;
+    if (roleId === 5) {
+      log = await paymentService.review({
+        logId,
+        action,
+        reviewedById: userId,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } else {
+      log = await paymentService.authorize({
+        logId,
+        action,
+        authorizedById: userId,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    }
     res.json({ success: true, data: { status: log.status } });
   } catch (err) {
     next(err);
@@ -147,10 +167,20 @@ const pendingPayments = async (req, res, next) => {
     const { roleId, branchId } = req.user;
     const { sequelize } = require('../models');
 
-    // Secretaria ve pagos autorizados pendientes de aplicar; admin/supervisor ven pendientes de autorizar
-    const targetStatus = roleId === 4 ? 'autorizado' : 'pendiente';
+    // Determinar estado objetivo y título de página por rol
+    let targetStatus = 'pendiente';
+    let pageTitle = 'Pagos Pendientes de Revisión';
+    if (roleId === 4) {
+      targetStatus = 'autorizado';
+      pageTitle = 'Pagos por Aplicar en ERP';
+    } else if (roleId === 1 || roleId === 2) {
+      targetStatus = 'revisado';
+      pageTitle = 'Pagos Pendientes de Autorización';
+    } else if (roleId === 5) {
+      targetStatus = 'pendiente';
+      pageTitle = 'Pagos Pendientes de Revisión';
+    }
     const branchFilter = roleId !== 1 ? 'AND c.branchId = :branchId' : '';
-    const pageTitle    = roleId === 4 ? 'Pagos por Aplicar en ERP' : 'Pagos Pendientes de Autorización';
 
     const [rows] = await sequelize.query(`
       SELECT cl.id, cl.paymentAmount, cl.paymentType, cl.status, cl.createdAt,

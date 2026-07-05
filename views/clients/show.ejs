@@ -30,6 +30,7 @@ const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', recha
           <div class="flex gap-2" style="flex-wrap:wrap">
             <% if (user.roleId === 1 || user.roleId === 2 || user.roleId === 3) { %>
             <button class="btn btn-ghost" onclick="document.getElementById('modalClientTask').classList.add('open')">+ Nueva tarea</button>
+            <a href="/clients/<%= client.id %>/map" class="btn btn-ghost">📍 Mapa de ubicaciones</a>
             <% } %>
             <% if ((user.roleId === 1 || user.roleId === 2) && !legalCase) { %>
             <button class="btn btn-ghost" style="color:var(--error-text)" onclick="escalateToLegal()">⚖️ Escalar a proceso legal</button>
@@ -167,7 +168,7 @@ const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', recha
               <span style="font-size:12px;font-weight:600;color:var(--ink-2)"><%= log.type %></span>
               <% if (log.paymentAmount) { %>
                 <span class="badge <%= STATUS_CLASS[log.status] || 'badge-neutral' %>"><%= log.status %></span>
-                <span class="mono" style="font-size:12px;color:var(--amber);font-weight:600">$ <%= fmt(log.paymentAmount) %> (<%= ({efectivo:'Efectivo',especie:'Especie',cheque:'Cheque',transferencia:'Transferencia'})[log.paymentType] || log.paymentType %>)</span>
+                <span class="mono" style="font-size:12px;color:var(--amber);font-weight:600">$ <%= fmt(log.paymentAmount) %> (<%= ({efectivo:'Efectivo',nota_abono:'Nota de Abono',especie:'Especie',cheque:'Cheque',transferencia:'Transferencia'})[log.paymentType] || log.paymentType %>)</span>
               <% } %>
               <span class="text-muted text-sm" style="margin-left:auto"><%= fmtDT(log.createdAt) %></span>
             </div>
@@ -242,6 +243,7 @@ const STATUS_CLASS = { pendiente:'badge-warn', autorizado:'badge-success', recha
               <select class="form-control" name="paymentType">
                 <option value="">— ninguno —</option>
                 <option value="efectivo">Efectivo</option>
+                <option value="nota_abono">Nota de Abono</option>
                 <option value="especie">Especie</option>
                 <option value="cheque">Cheque</option>
                 <option value="transferencia">Transferencia</option>

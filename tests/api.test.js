@@ -8,6 +8,7 @@
 const http  = require('http');
 const https = require('https');
 const assert = require('assert');
+const app = require('../app');
 
 const BASE = 'http://localhost:3000';
 
@@ -448,22 +449,32 @@ async function testSupervisorBranchFilter() {
   console.log('SIGMA — API Test Suite');
   console.log('='.repeat(40));
 
-  await testAuth();
-  await testPermissions();
-  await testClients();
-  await testCollectionValidation();
-  await testReports();
-  await testPaymentStateMachine();
-  await testPushApi();
-  await testUsers();
-  await testClientImportExcel();
-  await testGpsAlert();
-  await testSupervisorBranchFilter();
+  const server = app.listen(3000, async () => {
+    try {
+      await testAuth();
+      await testPermissions();
+      await testClients();
+      await testCollectionValidation();
+      await testReports();
+      await testPaymentStateMachine();
+      await testPushApi();
+      await testUsers();
+      await testClientImportExcel();
+      await testGpsAlert();
+      await testSupervisorBranchFilter();
 
-  console.log('\n' + '='.repeat(40));
-  if (process.exitCode === 1) {
-    console.log('Resultado: FALLOS ENCONTRADOS');
-  } else {
-    console.log('Resultado: TODOS LOS TESTS PASARON ✓');
-  }
+      console.log('\n' + '='.repeat(40));
+      if (process.exitCode === 1) {
+        console.log('Resultado: FALLOS ENCONTRADOS');
+      } else {
+        console.log('Resultado: TODOS LOS TESTS PASARON ✓');
+      }
+      server.close();
+      process.exit(process.exitCode === 1 ? 1 : 0);
+    } catch (err) {
+      console.error('Error durante la ejecución de pruebas:', err);
+      server.close();
+      process.exit(1);
+    }
+  });
 })();

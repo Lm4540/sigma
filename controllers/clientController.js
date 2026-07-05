@@ -255,4 +255,82 @@ const deleteContact = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { index, show, importData, create, createContact, deleteContact };
+const showMap = async (req, res, next) => {
+  try {
+    const { userId, roleId, branchId } = req.user;
+    const client = await Client.findByPk(req.params.id);
+    if (!client) return res.status(404).render('error', { title: 'No encontrado', message: 'Cliente no encontrado', status: 404, user: req.user });
+
+    // Restricciones de visibilidad por rol
+    if (roleId === 3) {
+      const assignment = await ClientAssignment.findOne({ where: { clientId: client.id, userId, isActive: 1 } });
+      if (!assignment) return res.status(403).render('error', { title: 'Sin acceso', message: 'No tienes asignado este cliente', status: 403, user: req.user });
+    } else if (roleId !== 1 && client.branchId !== branchId) {
+      return res.status(403).render('error', { title: 'Sin acceso', message: 'Cliente de otra sucursal', status: 403, user: req.user });
+    }
+
+    // Cargar todas las gestiones de tipo visita geolocalizadas
+    const visits = await CollectionLog.findAll({
+      where: {
+        clientId: client.id,
+        type: 'Visita',
+        latitude: { [Op.ne]: null },
+        longitude: { [Op.ne]: null }
+      },
+      include: [{ model: User, as: 'gestor', attributes: ['name'] }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Algoritmo de tolerancia de 500 metros (0.5 km)
+    const gpsService = require('../services/gpsService');
+    const pins = [];
+
+    for (const v of visits) {
+      const vLat = parseFloat(v.latitude);
+      const vLng = parseFloat(v.longitude);
+      let foundGroup = false;
+
+      for (const pin of pins) {
+        const distance = gpsService.calculateDistance(vLat, vLng, pin.latitude, pin.longitude);
+        if (distance <= 0.5) { // 500 metros
+          pin.visits.push({
+            id: v.id,
+            comment: v.comment,
+            createdAt: v.createdAt,
+            gestorName: v.gestor ? v.gestor.name : 'Sistema',
+            distance: (distance * 1000).toFixed(0) // distancia en metros
+          });
+          foundGroup = true;
+          break;
+        }
+      }
+
+      if (!foundGroup) {
+        pins.push({
+          latitude: vLat,
+          longitude: vLng,
+          visits: [{
+            id: v.id,
+            comment: v.comment,
+            createdAt: v.createdAt,
+            gestorName: v.gestor ? v.gestor.name : 'Sistema',
+            distance: 0
+          }]
+        });
+      }
+    }
+
+    res.render('clients/map', {
+      title: `Ubicaciones de ${client.name}`,
+      user: req.user,
+      client,
+      pins,
+      lastKnownLat: client.lastKnownLat || null,
+      lastKnownLng: client.lastKnownLng || null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { index, show, importData, create, createContact, deleteContact, showMap };

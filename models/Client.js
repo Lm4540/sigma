@@ -17,5 +17,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define('Client', {
   // Columna GENERATED en MySQL/MariaDB — solo lectura, Sequelize no la escribe
   riskCategory:    { type: DataTypes.STRING(5) },
   lastActivity:    { type: DataTypes.DATE, allowNull: true },
+  lastKnownLat:    { type: DataTypes.DECIMAL(10, 8), allowNull: true },
+  lastKnownLng:    { type: DataTypes.DECIMAL(11, 8), allowNull: true },
   createdBy:       { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
 }, { tableName: 'clients', timestamps: true });
