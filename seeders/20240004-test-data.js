@@ -39,7 +39,7 @@ const roundM   = (n) => Math.round(n * 100) / 100;
 
 module.exports = {
   async up(queryInterface) {
-    const hash = await bcrypt.hash('Password1!', 10);
+    const hash = await bcrypt.hash('admin123', 10);
     const now  = new Date();
 
     // ── Usuarios ──────────────────────────────────────────────────────────────

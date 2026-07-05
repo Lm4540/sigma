@@ -3,7 +3,7 @@
 const path = require('path');
 const fs   = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { LegalCase, LegalDocument, Client, User, Task, ClientContact, sequelize } = require('../models');
+const { LegalCase, LegalDocument, Client, User, Task, ClientContact, CollectionLog, sequelize } = require('../models');
 const auditService = require('../services/auditService');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'legal');

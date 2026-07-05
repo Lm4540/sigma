@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 
 module.exports = {
   async up(queryInterface) {
-    const hash = await bcrypt.hash('Admin123!', 10);
+    const hash = await bcrypt.hash('admin123', 10);
     await queryInterface.bulkInsert('Users', [
       {
         id: 1,
